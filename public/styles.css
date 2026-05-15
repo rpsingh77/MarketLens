@@ -1574,7 +1574,6 @@ button:active {
     height: auto;
     max-height: none;
     min-height: 0;
-    order: -1;
   }
 
   .watchlist-content {
@@ -1719,7 +1718,7 @@ button:active {
     gap: 7px;
   }
 
-  button {
+  button:not(.workspace-tab) {
     width: 100%;
     min-height: 44px;
   }
