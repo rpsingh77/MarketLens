@@ -12,6 +12,10 @@ const chartQuote = document.getElementById('chart-quote');
 const chartLast = document.getElementById('chart-last');
 const chartChange = document.getElementById('chart-change');
 const chartChangePercent = document.getElementById('chart-change-percent');
+const indicatorToggles = document.querySelectorAll('.indicator-toggle');
+const chartFrame = document.getElementById('chart-frame');
+const macdPane = document.getElementById('macd-pane');
+const rsiPane = document.getElementById('rsi-pane');
 const optionsTitle = document.getElementById('options-title');
 const optionsExpirySelect = document.getElementById('options-expiry-select');
 const optionsStatus = document.getElementById('options-status');
@@ -50,6 +54,9 @@ let rsiSeries;
 let rsiUpperSeries;
 let rsiLowerSeries;
 let chartResizeObserver;
+let isSyncingTimeScale = false;
+let shouldFitChartsOnNextResize = false;
+let selectedIndicators = new Set(['ema50', 'ema100', 'ema200', 'macd', 'rsi']);
 const DISPLAY_CALENDAR_DAYS = 365;
 const WATCHLIST_PRICE_BATCH_SIZE = 5;
 const OPTION_STRIKES_EACH_SIDE = 25;
@@ -76,21 +83,86 @@ function showStatus(message, isError = false) {
   statusEl.classList.toggle('error', isError);
 }
 
-function resizeCharts() {
+function getChartContainerSize(container, fallbackHeight) {
+  const rect = container.getBoundingClientRect();
+  const primaryWidth = document.querySelector('.primary-content')?.clientWidth || window.innerWidth || 900;
+
+  return {
+    width: Math.max(320, Math.round(rect.width || container.clientWidth || primaryWidth - 30)),
+    height: Math.max(60, Math.round(rect.height || container.clientHeight || fallbackHeight))
+  };
+}
+
+function fitChartsToContent() {
   if (!chart) return;
 
-  chart.applyOptions({
-    width: chartContainer.clientWidth,
-    height: chartContainer.clientHeight
+  chart.timeScale().fitContent();
+  macdChart.timeScale().fitContent();
+  rsiChart.timeScale().fitContent();
+  shouldFitChartsOnNextResize = false;
+}
+
+function resizeCharts({ fitContent = false } = {}) {
+  if (!chart) return;
+
+  const mainSize = getChartContainerSize(chartContainer, 300);
+  const macdSize = getChartContainerSize(macdContainer, 92);
+  const rsiSize = getChartContainerSize(rsiContainer, 78);
+
+  chart.applyOptions(mainSize);
+  macdChart.applyOptions(macdSize);
+  rsiChart.applyOptions(rsiSize);
+
+  if (fitContent) {
+    fitChartsToContent();
+  }
+}
+
+function scheduleChartResize(options = {}) {
+  requestAnimationFrame(() => {
+    resizeCharts(options);
+    requestAnimationFrame(() => resizeCharts(options));
   });
-  macdChart.applyOptions({
-    width: macdContainer.clientWidth,
-    height: macdContainer.clientHeight
+}
+
+function getSelectedIndicators() {
+  const checkedIndicators = [...indicatorToggles]
+    .filter(toggle => toggle.checked)
+    .map(toggle => toggle.value);
+
+  return new Set(checkedIndicators);
+}
+
+function getPaneLayout(showMacd, showRsi) {
+  if (showMacd && showRsi) return 'both';
+  if (showMacd) return 'macd';
+  if (showRsi) return 'rsi';
+  return 'none';
+}
+
+function applyIndicatorSelection(indicators = selectedIndicators) {
+  selectedIndicators = indicators instanceof Set ? indicators : new Set(indicators);
+
+  indicatorToggles.forEach(toggle => {
+    toggle.checked = selectedIndicators.has(toggle.value);
   });
-  rsiChart.applyOptions({
-    width: rsiContainer.clientWidth,
-    height: rsiContainer.clientHeight
-  });
+
+  const showEma50 = selectedIndicators.has('ema50');
+  const showEma100 = selectedIndicators.has('ema100');
+  const showEma200 = selectedIndicators.has('ema200');
+  const showMacd = selectedIndicators.has('macd');
+  const showRsi = selectedIndicators.has('rsi');
+
+  if (chartFrame) chartFrame.dataset.panes = getPaneLayout(showMacd, showRsi);
+
+  if (macdPane) macdPane.hidden = !showMacd;
+  if (rsiPane) rsiPane.hidden = !showRsi;
+
+  if (ema50Series) ema50Series.applyOptions({ visible: showEma50 });
+  if (ema100Series) ema100Series.applyOptions({ visible: showEma100 });
+  if (ema200Series) ema200Series.applyOptions({ visible: showEma200 });
+
+  scheduleChartResize();
 }
 
 function activateWorkspaceTab(tabName) {
@@ -107,7 +179,7 @@ function activateWorkspaceTab(tabName) {
   });
 
   if (tabName === 'chart') {
-    requestAnimationFrame(resizeCharts);
+    scheduleChartResize({ fitContent: shouldFitChartsOnNextResize });
   }
 }
 
@@ -755,17 +827,37 @@ function updateGauge(technicalSignal) {
   gaugeRating.textContent = technicalSignal.label;
 }
 
+function syncTimeScaleRange(sourceChart, range) {
+  if (isSyncingTimeScale || !range) return;
+
+  isSyncingTimeScale = true;
+  [chart, macdChart, rsiChart].filter(chartInstance => chartInstance && chartInstance !== sourceChart).forEach(chartInstance => {
+    chartInstance.timeScale().setVisibleLogicalRange(range);
+  });
+  isSyncingTimeScale = false;
+}
+
+function syncChartTimeScales() {
+  [chart, macdChart, rsiChart].filter(Boolean).forEach(chartInstance => {
+    chartInstance.timeScale().subscribeVisibleLogicalRangeChange(range => {
+      syncTimeScaleRange(chartInstance, range);
+    });
+  });
+}
+
 function ensureChart() {
   if (chart) return;
 
   const baseOptions = getChartThemeOptions();
   const success = getCssVar('--success') || '#16a34a';
   const danger = getCssVar('--danger') || '#dc2626';
+  const mainSize = getChartContainerSize(chartContainer, 300);
+  const macdSize = getChartContainerSize(macdContainer, 92);
+  const rsiSize = getChartContainerSize(rsiContainer, 78);
 
   chart = LightweightCharts.createChart(chartContainer, {
     ...baseOptions,
-    width: chartContainer.clientWidth,
-    height: chartContainer.clientHeight
+    ...mainSize
   });
 
   candleSeries = chart.addCandlestickSeries({
@@ -805,8 +897,7 @@ function ensureChart() {
 
   macdChart = LightweightCharts.createChart(macdContainer, {
     ...baseOptions,
-    width: macdContainer.clientWidth,
-    height: macdContainer.clientHeight
+    ...macdSize
   });
   macdHistogramSeries = macdChart.addHistogramSeries({
     priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
@@ -828,8 +919,7 @@ function ensureChart() {
 
   rsiChart = LightweightCharts.createChart(rsiContainer, {
     ...baseOptions,
-    width: rsiContainer.clientWidth,
-    height: rsiContainer.clientHeight
+    ...rsiSize
   });
   rsiSeries = rsiChart.addLineSeries({
     color: '#7c3aed',
@@ -853,6 +943,7 @@ function ensureChart() {
   chartResizeObserver = new ResizeObserver(entries => {
     entries.forEach(entry => {
       const { width, height } = entry.contentRect;
+      if (width <= 0 || height <= 0) return;
       if (entry.target === chartContainer) chart.applyOptions({ width, height });
       if (entry.target === macdContainer) macdChart.applyOptions({ width, height });
       if (entry.target === rsiContainer) rsiChart.applyOptions({ width, height });
@@ -861,6 +952,8 @@ function ensureChart() {
   chartResizeObserver.observe(chartContainer);
   chartResizeObserver.observe(macdContainer);
   chartResizeObserver.observe(rsiContainer);
+  syncChartTimeScales();
+  applyIndicatorSelection(selectedIndicators);
 }
 
 function toLineData(formatted, values) {
@@ -950,6 +1043,7 @@ function createChart(data, ticker) {
   ema50Series.setData(toLineData(formatted, ema50));
   ema100Series.setData(toLineData(formatted, ema100));
   ema200Series.setData(toLineData(formatted, ema200));
+  applyIndicatorSelection(selectedIndicators);
   macdLineSeries.setData(toLineData(formatted, macd));
   macdSignalSeries.setData(toLineData(formatted, macdSignal));
   macdHistogramSeries.setData(toLineData(formatted, macdHistogram).map(point => ({
@@ -959,9 +1053,8 @@ function createChart(data, ticker) {
   rsiSeries.setData(toLineData(formatted, rsi));
   rsiUpperSeries.setData(formatted.map(point => ({ time: point.x, value: 70 })));
   rsiLowerSeries.setData(formatted.map(point => ({ time: point.x, value: 30 })));
-  chart.timeScale().fitContent();
-  macdChart.timeScale().fitContent();
-  rsiChart.timeScale().fitContent();
+  shouldFitChartsOnNextResize = true;
+  scheduleChartResize({ fitContent: !document.getElementById('chart-panel')?.hidden });
 
   return formatted.length;
 }
@@ -1023,6 +1116,12 @@ if (watchlistToggle) {
 workspaceTabs.forEach(tab => {
   tab.addEventListener('click', () => {
     activateWorkspaceTab(tab.dataset.tab);
+  });
+});
+
+indicatorToggles.forEach(toggle => {
+  toggle.addEventListener('change', () => {
+    applyIndicatorSelection(getSelectedIndicators());
   });
 });
 

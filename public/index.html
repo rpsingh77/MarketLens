@@ -70,20 +70,41 @@
               <span>Change% <strong id="chart-change-percent">--</strong></span>
             </div>
             <div class="chart-tools">
-              <div class="legend-note">
-                <span class="legend-dot ema50"></span>EMA 50
-                <span class="legend-dot ema100"></span>EMA 100
-                <span class="legend-dot ema200"></span>EMA 200
-              </div>
+              <fieldset class="indicator-control" aria-label="Chart indicators">
+                <span>Indicator</span>
+                <label>
+                  <input class="indicator-toggle" type="checkbox" value="ema50" checked />
+                  <span class="legend-dot ema50" aria-hidden="true"></span>
+                  EMA 50
+                </label>
+                <label>
+                  <input class="indicator-toggle" type="checkbox" value="ema100" checked />
+                  <span class="legend-dot ema100" aria-hidden="true"></span>
+                  EMA 100
+                </label>
+                <label>
+                  <input class="indicator-toggle" type="checkbox" value="ema200" checked />
+                  <span class="legend-dot ema200" aria-hidden="true"></span>
+                  EMA 200
+                </label>
+                <label>
+                  <input class="indicator-toggle" type="checkbox" value="macd" checked />
+                  MACD
+                </label>
+                <label>
+                  <input class="indicator-toggle" type="checkbox" value="rsi" checked />
+                  RSI
+                </label>
+              </fieldset>
             </div>
           </div>
-          <div class="chart-frame">
+          <div id="chart-frame" class="chart-frame" data-panes="both">
             <div id="ohlc-chart"></div>
-            <div class="indicator-pane">
+            <div id="macd-pane" class="indicator-pane">
               <span>MACD</span>
               <div id="macd-chart"></div>
             </div>
-            <div class="indicator-pane">
+            <div id="rsi-pane" class="indicator-pane">
               <span>RSI</span>
               <div id="rsi-chart"></div>
             </div>
@@ -120,17 +141,10 @@
               </div>
             </div>
 
-            <div class="watchlist-header">
-              <div>
-                <p class="eyebrow">Watchlist</p>
-              </div>
-            </div>
-
             <form id="watchlist-form" class="watchlist-form">
-              <label for="watchlist-input">Add ticker</label>
+              <label class="sr-only" for="watchlist-input">Add ticker</label>
               <div class="watchlist-input-row">
-                <input id="watchlist-input" name="watchlist-symbol" type="text" placeholder="MSFT" autocomplete="off" spellcheck="false" />
-                <button type="submit" aria-label="Add ticker">✓</button>
+                <input id="watchlist-input" name="watchlist-symbol" type="text" placeholder="Enter ticker to add..." autocomplete="off" spellcheck="false" />
               </div>
             </form>
             <div id="status" class="status"></div>

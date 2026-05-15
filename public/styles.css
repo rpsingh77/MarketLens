@@ -433,6 +433,7 @@ h2 {
 }
 
 .primary-content {
+  gap: 0;
   height: calc(100vh - var(--dashboard-shell-offset));
   min-height: 660px;
   grid-template-rows: auto minmax(0, 1fr);
@@ -511,6 +512,11 @@ h2 {
   display: none !important;
 }
 
+.tab-panel {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
 .chart-panel,
 .watchlist-panel {
   border: 1px solid var(--line);
@@ -587,6 +593,18 @@ button:active {
   transform: translateY(0);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .status {
   grid-area: status;
   min-height: 1rem;
@@ -616,7 +634,7 @@ button:active {
 
 .chart-header {
   display: grid;
-  grid-template-columns: minmax(80px, auto) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(80px, auto) minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   margin-bottom: 10px;
@@ -673,11 +691,55 @@ button:active {
 }
 
 .chart-tools {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.indicator-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  flex-wrap: wrap;
+}
+
+.indicator-control > span {
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.indicator-control label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted-strong);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.indicator-toggle {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
 }
 
 .legend-note {
@@ -844,6 +906,15 @@ button:active {
   gap: 8px;
 }
 
+.chart-frame[data-panes="none"] {
+  grid-template-rows: minmax(300px, 1fr);
+}
+
+.chart-frame[data-panes="macd"],
+.chart-frame[data-panes="rsi"] {
+  grid-template-rows: minmax(260px, 1fr) 110px;
+}
+
 #ohlc-chart,
 #macd-chart,
 #rsi-chart {
@@ -856,6 +927,10 @@ button:active {
   min-height: 0;
   border-top: 1px solid var(--line);
   padding-top: 7px;
+}
+
+.indicator-pane[hidden] {
+  display: none;
 }
 
 .indicator-pane > span {
@@ -925,10 +1000,9 @@ button:active {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(440px, 1fr) minmax(300px, 0.72fr);
-  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   grid-template-areas:
     "sentiment news"
-    "header news"
     "form news"
     "status news"
     "table-head news"
@@ -973,8 +1047,7 @@ button:active {
 
 .watchlist-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
   min-width: 0;
 }
@@ -1579,10 +1652,9 @@ button:active {
   .watchlist-content {
     height: auto;
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto auto;
     grid-template-areas:
       "sentiment"
-      "header"
       "form"
       "status"
       "table-head"
@@ -1716,6 +1788,15 @@ button:active {
     grid-template-rows: minmax(210px, 1fr) 86px 76px;
     padding: 8px;
     gap: 7px;
+  }
+
+  .chart-frame[data-panes="none"] {
+    grid-template-rows: minmax(300px, 1fr);
+  }
+
+  .chart-frame[data-panes="macd"],
+  .chart-frame[data-panes="rsi"] {
+    grid-template-rows: minmax(230px, 1fr) 96px;
   }
 
   button:not(.workspace-tab) {
