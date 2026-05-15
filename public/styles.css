@@ -976,7 +976,7 @@ button:active {
   padding: 12px;
   background: var(--chart-bg);
   display: grid;
-  grid-template-rows: minmax(210px, 1fr) 92px 78px;
+  grid-template-rows: minmax(210px, 1fr) 130px 120px;
   gap: 8px;
 }
 
@@ -986,7 +986,7 @@ button:active {
 
 .chart-frame[data-panes="macd"],
 .chart-frame[data-panes="rsi"] {
-  grid-template-rows: minmax(260px, 1fr) 110px;
+  grid-template-rows: minmax(240px, 1fr) 150px;
 }
 
 #ohlc-chart,
@@ -1989,7 +1989,7 @@ button:active {
 
   .chart-frame {
     height: clamp(430px, 70vh, 560px);
-    grid-template-rows: minmax(210px, 1fr) 86px 76px;
+    grid-template-rows: minmax(190px, 1fr) 118px 108px;
     padding: 8px;
     gap: 7px;
   }
@@ -2000,7 +2000,7 @@ button:active {
 
   .chart-frame[data-panes="macd"],
   .chart-frame[data-panes="rsi"] {
-    grid-template-rows: minmax(230px, 1fr) 96px;
+    grid-template-rows: minmax(210px, 1fr) 132px;
   }
 
   button:not(.workspace-tab) {
