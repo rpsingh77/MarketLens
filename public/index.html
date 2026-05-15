@@ -58,6 +58,7 @@
           <button id="watchlist-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="watchlist-panel" data-tab="watchlist">Watchlist</button>
           <button id="chart-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="chart-panel" data-tab="chart">Chart</button>
           <button id="options-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="options-panel" data-tab="options">Option Chain</button>
+          <button id="option-insight-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="option-insight-panel" data-tab="option-insight">Option Insight</button>
           <button id="ai-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="ai-panel" data-tab="ai">AI Insight</button>
         </div>
 
@@ -125,6 +126,7 @@
             <div class="sentiment-panel">
               <div class="sentiment-heading">
                 <h2 id="sentiment-ticker-heading">AAPL</h2>
+                <span id="sentiment-ticker-price">--</span>
               </div>
               <div id="signal-gauge" class="signal-gauge neutral" aria-label="Technical rating gauge">
                 <span id="gauge-percent" class="gauge-percent">50%</span>
@@ -220,6 +222,19 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section id="option-insight-panel" class="option-insight-panel tab-panel" role="tabpanel" aria-labelledby="option-insight-tab" hidden>
+          <div class="option-insight-panel-header">
+            <div>
+              <h2 id="option-insight-title">AAPL AI option insight</h2>
+            </div>
+            <button id="option-ai-refresh" type="button">Generate AI Insight</button>
+          </div>
+          <div id="option-ai-status" class="option-ai-status">Open the tab to generate an AI option read.</div>
+          <div id="option-ai-content" class="option-ai-content">
+            <div class="option-ai-empty">AI option insight will appear here.</div>
           </div>
         </section>
 

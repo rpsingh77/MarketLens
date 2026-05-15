@@ -327,6 +327,69 @@ app.get('/api/options', async (req, res) => {
   }
 });
 
+async function fetchOptionsSummary(ticker) {
+  const session = await getYahooSession();
+  const url = `https://query1.finance.yahoo.com/v7/finance/options/${encodeURIComponent(ticker)}?crumb=${encodeURIComponent(session.crumb)}`;
+  const response = await fetch(url, {
+    headers: {
+      'Accept': 'application/json',
+      'Cookie': session.cookie,
+      'User-Agent': 'Mozilla/5.0'
+    }
+  });
+  if (!response.ok) {
+    const error = new Error(`Yahoo Finance options request failed with status ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  const payload = await response.json();
+  const result = payload.optionChain?.result?.[0];
+  const error = payload.optionChain?.error;
+  const chain = result?.options?.[0];
+  const quote = result?.quote || {};
+
+  if (error || !result || !chain) {
+    const notFound = new Error(`Could not fetch option chain for ticker ${ticker}.`);
+    notFound.status = 404;
+    throw notFound;
+  }
+
+  const calls = chain.calls || [];
+  const puts = chain.puts || [];
+  const underlyingPrice = quote.regularMarketPrice;
+  if (!calls.length && !puts.length) {
+    const empty = new Error(`No options returned for ticker ${ticker}.`);
+    empty.status = 404;
+    throw empty;
+  }
+
+  const strikes = [...calls, ...puts]
+    .map(contract => contract.strike)
+    .filter(strike => typeof strike === 'number');
+  const atmStrike = strikes.reduce((closest, strike) => {
+    if (closest == null) return strike;
+    return Math.abs(strike - underlyingPrice) < Math.abs(closest - underlyingPrice) ? strike : closest;
+  }, null);
+
+  const findContract = contracts => contracts
+    .filter(contract => contract.strike === atmStrike)
+    .sort((a, b) => (b.openInterest || 0) - (a.openInterest || 0))[0] || null;
+
+  const expiration = chain.expirationDate
+    ? new Date(chain.expirationDate * 1000).toISOString().slice(0, 10)
+    : null;
+
+  return {
+    ticker,
+    underlyingPrice,
+    expiration,
+    strike: atmStrike,
+    call: findContract(calls),
+    put: findContract(puts)
+  };
+}
+
 app.get('/api/options-summary', async (req, res) => {
   const ticker = (req.query.ticker || '').trim().toUpperCase();
   if (!ticker) {
@@ -334,62 +397,86 @@ app.get('/api/options-summary', async (req, res) => {
   }
 
   try {
-    const session = await getYahooSession();
-    const url = `https://query1.finance.yahoo.com/v7/finance/options/${encodeURIComponent(ticker)}?crumb=${encodeURIComponent(session.crumb)}`;
-    const response = await fetch(url, {
+    return res.json(await fetchOptionsSummary(ticker));
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message || 'Unknown error while fetching option chain.' });
+  }
+});
+
+app.get('/api/ai-option-insight', async (req, res) => {
+  const ticker = (req.query.ticker || '').trim().toUpperCase();
+  if (!ticker) {
+    return res.status(400).json({ error: 'Ticker symbol is required.' });
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server.' });
+  }
+
+  try {
+    const context = await fetchOptionsSummary(ticker);
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
       headers: {
-        'Accept': 'application/json',
-        'Cookie': session.cookie,
-        'User-Agent': 'Mozilla/5.0'
-      }
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+        instructions: [
+          'You are a concise options research assistant for a stock dashboard.',
+          'Use only the supplied JSON context. Do not invent prices, Greeks, catalysts, or events.',
+          'Avoid financial advice. Frame outputs as observations about option activity and risk, not trade instructions.'
+        ].join(' '),
+        input: `Create an option insight from this nearest-strike options context:\n${JSON.stringify(context, null, 2)}`,
+        max_output_tokens: 700,
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'option_insight',
+            strict: true,
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['summary', 'activityRead', 'volatilityRead', 'bullishObservation', 'bearishObservation', 'watchItems', 'riskNote'],
+              properties: {
+                summary: { type: 'string' },
+                activityRead: { type: 'string' },
+                volatilityRead: { type: 'string' },
+                bullishObservation: { type: 'string' },
+                bearishObservation: { type: 'string' },
+                watchItems: {
+                  type: 'array',
+                  minItems: 2,
+                  maxItems: 4,
+                  items: { type: 'string' }
+                },
+                riskNote: { type: 'string' }
+              }
+            }
+          }
+        }
+      })
     });
-    if (!response.ok) {
-      return res.status(response.status).json({ error: `Yahoo Finance options request failed with status ${response.status}` });
-    }
 
     const payload = await response.json();
-    const result = payload.optionChain?.result?.[0];
-    const error = payload.optionChain?.error;
-    const chain = result?.options?.[0];
-    const quote = result?.quote || {};
-
-    if (error || !result || !chain) {
-      return res.status(404).json({ error: `Could not fetch option chain for ticker ${ticker}.` });
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: payload.error?.message || `OpenAI request failed with status ${response.status}`
+      });
     }
 
-    const calls = chain.calls || [];
-    const puts = chain.puts || [];
-    const underlyingPrice = quote.regularMarketPrice;
-    if (!calls.length && !puts.length) {
-      return res.status(404).json({ error: `No options returned for ticker ${ticker}.` });
-    }
-
-    const strikes = [...calls, ...puts]
-      .map(contract => contract.strike)
-      .filter(strike => typeof strike === 'number');
-    const atmStrike = strikes.reduce((closest, strike) => {
-      if (closest == null) return strike;
-      return Math.abs(strike - underlyingPrice) < Math.abs(closest - underlyingPrice) ? strike : closest;
-    }, null);
-
-    const findContract = contracts => contracts
-      .filter(contract => contract.strike === atmStrike)
-      .sort((a, b) => (b.openInterest || 0) - (a.openInterest || 0))[0] || null;
-
-    const expiration = chain.expirationDate
-      ? new Date(chain.expirationDate * 1000).toISOString().slice(0, 10)
-      : null;
-
+    const text = extractOpenAIText(payload);
+    const insight = JSON.parse(text);
     return res.json({
       ticker,
-      underlyingPrice,
-      expiration,
-      strike: atmStrike,
-      call: findContract(calls),
-      put: findContract(puts)
+      generatedAt: new Date().toISOString(),
+      context,
+      insight
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Unknown error while fetching option chain.' });
+    return res.status(err.status || 500).json({ error: err.message || 'Unknown error while generating AI option insight.' });
   }
 });
 

@@ -8,6 +8,7 @@ const summaryChange = document.getElementById('summary-change');
 const summaryRange = document.getElementById('summary-range');
 const chartHeading = document.getElementById('chart-heading');
 const sentimentTickerHeading = document.getElementById('sentiment-ticker-heading');
+const sentimentTickerPrice = document.getElementById('sentiment-ticker-price');
 const chartQuote = document.getElementById('chart-quote');
 const chartLast = document.getElementById('chart-last');
 const chartChange = document.getElementById('chart-change');
@@ -24,6 +25,10 @@ const optionsPrice = document.getElementById('options-price');
 const optionsExpirySelect = document.getElementById('options-expiry-select');
 const optionsStatus = document.getElementById('options-status');
 const optionsChainBody = document.getElementById('options-chain-body');
+const optionInsightTitle = document.getElementById('option-insight-title');
+const optionAiRefresh = document.getElementById('option-ai-refresh');
+const optionAiStatus = document.getElementById('option-ai-status');
+const optionAiContent = document.getElementById('option-ai-content');
 const aiTitle = document.getElementById('ai-title');
 const aiRefresh = document.getElementById('ai-refresh');
 const aiStatus = document.getElementById('ai-status');
@@ -101,6 +106,7 @@ let watchlistNames = {};
 let watchlistSparklineData = {};
 let watchlistThirtyDaySparklineData = {};
 let lastAiTicker = '';
+let lastOptionAiTicker = '';
 
 function showStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -229,6 +235,10 @@ function activateWorkspaceTab(tabName) {
 
   if (tabName === 'ai' && lastAiTicker !== currentTicker) {
     fetchAiInsight(currentTicker);
+  }
+
+  if (tabName === 'option-insight' && lastOptionAiTicker !== currentTicker) {
+    fetchAiOptionInsight(currentTicker);
   }
 }
 
@@ -633,6 +643,16 @@ function formatOptionValue(value, formatter = valueToFormat => valueToFormat) {
   return formatter(value);
 }
 
+function formatWholeNumber(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatImpliedVolatility(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
+  return `${(value * 100).toFixed(1)}%`;
+}
+
 function formatSignedPercent(value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
@@ -942,6 +962,88 @@ async function fetchAiInsight(ticker = currentTicker) {
   }
 }
 
+function setOptionAiStatus(message, isError = false) {
+  if (!optionAiStatus) return;
+  optionAiStatus.textContent = message;
+  optionAiStatus.classList.toggle('error', isError);
+}
+
+function renderAiOptionInsight(payload) {
+  if (!optionAiContent) return;
+  const insight = payload.insight || {};
+  const sections = [
+    ['Activity Read', insight.activityRead],
+    ['Volatility Read', insight.volatilityRead],
+    ['Bullish Observation', insight.bullishObservation],
+    ['Bearish Observation', insight.bearishObservation],
+    ['Watch Items', insight.watchItems],
+    ['Risk Note', insight.riskNote]
+  ];
+
+  optionAiContent.textContent = '';
+
+  const summaryCard = document.createElement('section');
+  summaryCard.className = 'option-ai-card option-ai-summary-card';
+  summaryCard.innerHTML = `
+    <span>AI Take</span>
+    <strong>${insight.summary || 'No summary returned.'}</strong>
+  `;
+  optionAiContent.append(summaryCard);
+
+  sections.forEach(([title, value]) => {
+    const card = document.createElement('section');
+    card.className = 'option-ai-card';
+    const values = Array.isArray(value) ? value : [value].filter(Boolean);
+    card.innerHTML = `<h4>${title}</h4>`;
+
+    if (values.length) {
+      const list = document.createElement('ul');
+      values.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        list.append(li);
+      });
+      card.append(list);
+    } else {
+      const empty = document.createElement('p');
+      empty.textContent = '--';
+      card.append(empty);
+    }
+
+    optionAiContent.append(card);
+  });
+}
+
+async function fetchAiOptionInsight(ticker = currentTicker) {
+  if (!optionAiContent) return;
+  const normalizedTicker = normalizeTicker(ticker);
+  if (!normalizedTicker) {
+    setOptionAiStatus('Please select a ticker first.', true);
+    return;
+  }
+
+  if (optionAiRefresh) optionAiRefresh.disabled = true;
+  optionAiContent.innerHTML = '<div class="option-ai-empty">Generating AI option insight...</div>';
+  setOptionAiStatus('Asking OpenAI for an option read...');
+
+  try {
+    const res = await fetch(`/api/ai-option-insight?ticker=${encodeURIComponent(normalizedTicker)}`);
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload.error || 'Failed to generate AI option insight.');
+    }
+
+    renderAiOptionInsight(payload);
+    lastOptionAiTicker = normalizedTicker;
+    setOptionAiStatus(`AI option read generated for ${normalizedTicker}.`);
+  } catch (error) {
+    optionAiContent.innerHTML = '<div class="option-ai-empty">AI option insight unavailable.</div>';
+    setOptionAiStatus(error.message, true);
+  } finally {
+    if (optionAiRefresh) optionAiRefresh.disabled = false;
+  }
+}
+
 function setOptionsStatus(message, isError = false) {
   optionsStatus.textContent = message;
   optionsStatus.classList.toggle('error', isError);
@@ -1041,6 +1143,7 @@ function updateSummary(formatted, ticker) {
   const previous = formatted[formatted.length - 2];
   chartHeading.textContent = ticker;
   if (sentimentTickerHeading) sentimentTickerHeading.textContent = ticker;
+  if (sentimentTickerPrice) sentimentTickerPrice.textContent = formatCurrency(last.c);
 
   if (chartLast && chartChange && chartChangePercent) {
     chartLast.textContent = formatCurrency(last.c);
@@ -1454,8 +1557,12 @@ async function fetchOhlc(ticker) {
     fetchAnalystSummary(payload.ticker);
     currentTicker = payload.ticker;
     if (aiTitle) aiTitle.textContent = `${payload.ticker} insight`;
+    if (optionInsightTitle) optionInsightTitle.textContent = `${payload.ticker} option insight`;
     if (!document.getElementById('ai-panel')?.hidden) {
       fetchAiInsight(payload.ticker);
+    }
+    if (!document.getElementById('option-insight-panel')?.hidden) {
+      fetchAiOptionInsight(payload.ticker);
     }
     watchlistPrices[payload.ticker] = payload.data[payload.data.length - 1].close;
     if (payload.data.length > 1) {
@@ -1520,6 +1627,12 @@ if (themeSelect) {
 if (aiRefresh) {
   aiRefresh.addEventListener('click', () => {
     fetchAiInsight(currentTicker);
+  });
+}
+
+if (optionAiRefresh) {
+  optionAiRefresh.addEventListener('click', () => {
+    fetchAiOptionInsight(currentTicker);
   });
 }
 
