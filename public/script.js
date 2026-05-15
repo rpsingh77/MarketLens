@@ -20,9 +20,14 @@ const macdPane = document.getElementById('macd-pane');
 const rsiPane = document.getElementById('rsi-pane');
 const rsiLatestValue = document.getElementById('rsi-latest-value');
 const optionsTitle = document.getElementById('options-title');
+const optionsPrice = document.getElementById('options-price');
 const optionsExpirySelect = document.getElementById('options-expiry-select');
 const optionsStatus = document.getElementById('options-status');
 const optionsChainBody = document.getElementById('options-chain-body');
+const aiTitle = document.getElementById('ai-title');
+const aiRefresh = document.getElementById('ai-refresh');
+const aiStatus = document.getElementById('ai-status');
+const aiContent = document.getElementById('ai-content');
 const newsTitle = document.getElementById('news-title');
 const newsStatus = document.getElementById('news-status');
 const newsItems = document.getElementById('news-items');
@@ -70,6 +75,7 @@ const OPTION_STRIKES_EACH_SIDE = 25;
 const WATCHLIST_KEY = 'marketLensWatchlist';
 const THEME_KEY = 'marketLensTheme';
 const THEMES = new Set(['light', 'slate', 'mint', 'midnight', 'graphite', 'alpine', 'rose', 'contrast']);
+const DEFAULT_THEME = 'graphite';
 const WATCHLIST_RECOMMENDATION_LABELS = {
   'Strong Buy': 'S Buy',
   Buy: 'Buy',
@@ -91,6 +97,7 @@ let watchlistPrices = {};
 let watchlistDirections = {};
 let watchlistChanges = {};
 let watchlistRecommendations = {};
+let lastAiTicker = '';
 
 function showStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -216,6 +223,10 @@ function activateWorkspaceTab(tabName) {
   if (tabName === 'chart') {
     scheduleChartResize({ fitContent: shouldFitChartsOnNextResize });
   }
+
+  if (tabName === 'ai' && lastAiTicker !== currentTicker) {
+    fetchAiInsight(currentTicker);
+  }
 }
 
 function normalizeTicker(value) {
@@ -241,9 +252,9 @@ function saveWatchlist() {
 function getSavedTheme() {
   try {
     const saved = localStorage.getItem(THEME_KEY);
-    return THEMES.has(saved) ? saved : 'light';
+    return THEMES.has(saved) ? saved : DEFAULT_THEME;
   } catch (error) {
-    return 'light';
+    return DEFAULT_THEME;
   }
 }
 
@@ -300,7 +311,7 @@ function applyChartTheme() {
 }
 
 function applyTheme(theme) {
-  const normalizedTheme = THEMES.has(theme) ? theme : 'light';
+  const normalizedTheme = THEMES.has(theme) ? theme : DEFAULT_THEME;
   document.documentElement.dataset.theme = normalizedTheme;
   if (themeSelect) themeSelect.value = normalizedTheme;
 
@@ -589,6 +600,12 @@ function setMarketSummaryStatus(message, isError = false) {
   marketSummaryStatus.classList.toggle('error', isError);
 }
 
+function setAiStatus(message, isError = false) {
+  if (!aiStatus) return;
+  aiStatus.textContent = message;
+  aiStatus.classList.toggle('error', isError);
+}
+
 function formatMarketValue(value, symbol) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
   if (symbol === 'BTC-USD' || symbol === 'CL=F' || symbol === 'GC=F') {
@@ -728,6 +745,87 @@ async function fetchMarketSummary() {
   }
 }
 
+function renderAiInsight(payload) {
+  if (!aiContent) return;
+  const insight = payload.insight || {};
+  const sections = [
+    ['Setup', insight.setup],
+    ['Bull Case', insight.bullCase],
+    ['Bear Case', insight.bearCase],
+    ['Watch Items', insight.watchItems],
+    ['Risk Note', insight.riskNote]
+  ];
+
+  aiContent.textContent = '';
+
+  const summaryCard = document.createElement('section');
+  summaryCard.className = 'ai-card ai-summary-card';
+  summaryCard.innerHTML = `
+    <span>AI Take</span>
+    <strong>${insight.summary || 'No summary returned.'}</strong>
+  `;
+  aiContent.append(summaryCard);
+
+  sections.forEach(([title, value]) => {
+    const card = document.createElement('section');
+    card.className = 'ai-card';
+    const list = Array.isArray(value) ? value : [value].filter(Boolean);
+    card.innerHTML = `<h3>${title}</h3>`;
+
+    if (list.length) {
+      const ul = document.createElement('ul');
+      list.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        ul.append(li);
+      });
+      card.append(ul);
+    } else {
+      const empty = document.createElement('p');
+      empty.textContent = '--';
+      card.append(empty);
+    }
+
+    aiContent.append(card);
+  });
+
+  const meta = document.createElement('p');
+  meta.className = 'ai-disclaimer';
+  meta.textContent = 'AI-generated research note. Verify with primary sources before making financial decisions.';
+  aiContent.append(meta);
+}
+
+async function fetchAiInsight(ticker = currentTicker) {
+  if (!aiContent) return;
+  const normalizedTicker = normalizeTicker(ticker);
+  if (!normalizedTicker) {
+    setAiStatus('Please select a ticker first.', true);
+    return;
+  }
+
+  if (aiTitle) aiTitle.textContent = `${normalizedTicker} insight`;
+  if (aiRefresh) aiRefresh.disabled = true;
+  aiContent.innerHTML = '<div class="ai-empty">Generating insight...</div>';
+  setAiStatus('Asking OpenAI for a ticker insight...');
+
+  try {
+    const res = await fetch(`/api/ai-insight?ticker=${encodeURIComponent(normalizedTicker)}`);
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload.error || 'Failed to generate AI insight.');
+    }
+
+    renderAiInsight(payload);
+    lastAiTicker = normalizedTicker;
+    setAiStatus(`Generated from recent price action and headlines for ${normalizedTicker}.`);
+  } catch (error) {
+    aiContent.innerHTML = '<div class="ai-empty">AI insight unavailable.</div>';
+    setAiStatus(error.message, true);
+  } finally {
+    if (aiRefresh) aiRefresh.disabled = false;
+  }
+}
+
 function setOptionsStatus(message, isError = false) {
   optionsStatus.textContent = message;
   optionsStatus.classList.toggle('error', isError);
@@ -741,6 +839,11 @@ function renderOptionsChain(payload) {
     .sort((a, b) => a - b);
 
   optionsTitle.textContent = payload.ticker;
+  if (optionsPrice) {
+    optionsPrice.textContent = typeof payload.underlyingPrice === 'number'
+      ? formatCurrency(payload.underlyingPrice)
+      : '--';
+  }
   optionsChainBody.textContent = '';
 
   if (!strikes.length) {
@@ -811,6 +914,7 @@ async function fetchOptionChain(ticker, expiration) {
     setOptionsStatus('');
   } catch (error) {
     optionsTitle.textContent = ticker;
+    if (optionsPrice) optionsPrice.textContent = '--';
     optionsChainBody.innerHTML = '<tr><td colspan="9">Option chain unavailable.</td></tr>';
     setOptionsStatus(error.message, true);
   }
@@ -1226,6 +1330,10 @@ async function fetchOhlc(ticker) {
     fetchNews(payload.ticker);
     fetchAnalystSummary(payload.ticker);
     currentTicker = payload.ticker;
+    if (aiTitle) aiTitle.textContent = `${payload.ticker} insight`;
+    if (!document.getElementById('ai-panel')?.hidden) {
+      fetchAiInsight(payload.ticker);
+    }
     watchlistPrices[payload.ticker] = payload.data[payload.data.length - 1].close;
     if (payload.data.length > 1) {
       const last = payload.data[payload.data.length - 1];
@@ -1283,6 +1391,12 @@ optionsExpirySelect.addEventListener('change', () => {
 if (themeSelect) {
   themeSelect.addEventListener('change', () => {
     applyTheme(themeSelect.value);
+  });
+}
+
+if (aiRefresh) {
+  aiRefresh.addEventListener('click', () => {
+    fetchAiInsight(currentTicker);
   });
 }
 

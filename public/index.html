@@ -8,9 +8,9 @@
     (() => {
       try {
         const savedTheme = localStorage.getItem('marketLensTheme');
-        if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+        document.documentElement.dataset.theme = savedTheme || 'graphite';
       } catch (error) {
-        document.documentElement.dataset.theme = 'light';
+        document.documentElement.dataset.theme = 'graphite';
       }
     })();
   </script>
@@ -58,6 +58,7 @@
           <button id="watchlist-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="watchlist-panel" data-tab="watchlist">Watchlist</button>
           <button id="chart-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="chart-panel" data-tab="chart">Chart</button>
           <button id="options-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="options-panel" data-tab="options">Option Chain</button>
+          <button id="ai-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="ai-panel" data-tab="ai">AI Insight</button>
         </div>
 
         <section id="chart-panel" class="chart-panel tab-panel" role="tabpanel" aria-labelledby="chart-tab" hidden>
@@ -182,9 +183,9 @@
 
         <section id="options-panel" class="options-panel tab-panel" role="tabpanel" aria-labelledby="options-tab" hidden>
           <div class="options-panel-header">
-            <div>
-              <p class="eyebrow">Option Chain</p>
+            <div class="options-instrument">
               <h2 id="options-title">AAPL</h2>
+              <span id="options-price">--</span>
             </div>
             <label for="options-expiry-select">Expiry</label>
             <select id="options-expiry-select"></select>
@@ -216,6 +217,20 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section id="ai-panel" class="ai-panel tab-panel" role="tabpanel" aria-labelledby="ai-tab" hidden>
+          <div class="ai-panel-header">
+            <div>
+              <p class="eyebrow">OpenAI</p>
+              <h2 id="ai-title">AAPL insight</h2>
+            </div>
+            <button id="ai-refresh" type="button">Generate Insight</button>
+          </div>
+          <div id="ai-status" class="ai-status">Select a ticker, then generate an AI insight.</div>
+          <div id="ai-content" class="ai-content">
+            <div class="ai-empty">AI insight will appear here.</div>
           </div>
         </section>
 

@@ -1,8 +1,31 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 let yahooSession = null;
+
+function loadEnvFile() {
+  const envPath = path.join(__dirname, '.env');
+  if (!fs.existsSync(envPath)) return;
+
+  const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+
+    const separatorIndex = trimmed.indexOf('=');
+    if (separatorIndex === -1) return;
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim().replace(/^['"]|['"]$/g, '');
+    if (key && process.env[key] == null) {
+      process.env[key] = value;
+    }
+  });
+}
+
+loadEnvFile();
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -450,6 +473,185 @@ app.get('/api/market-summary', async (req, res) => {
     return res.json({ quotes });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Unknown error while fetching market summary.' });
+  }
+});
+
+function percentChange(current, previous) {
+  if (typeof current !== 'number' || typeof previous !== 'number' || previous === 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
+function getCloseAtOffset(closes, offset) {
+  if (!closes.length) return null;
+  const index = Math.max(0, closes.length - 1 - offset);
+  return closes[index];
+}
+
+function extractOpenAIText(payload) {
+  if (typeof payload.output_text === 'string') return payload.output_text;
+  const chunks = [];
+  (payload.output || []).forEach(item => {
+    (item.content || []).forEach(content => {
+      if (typeof content.text === 'string') chunks.push(content.text);
+    });
+  });
+  return chunks.join('\n').trim();
+}
+
+async function fetchTickerInsightContext(ticker) {
+  const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=6mo&interval=1d`;
+  const newsParams = new URLSearchParams({
+    q: ticker,
+    quotesCount: '0',
+    newsCount: '6'
+  });
+  const newsUrl = `https://query1.finance.yahoo.com/v1/finance/search?${newsParams.toString()}`;
+
+  const [chartResponse, newsResponse] = await Promise.all([
+    fetch(chartUrl, { headers: { 'Accept': 'application/json' } }),
+    fetch(newsUrl, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0'
+      }
+    })
+  ]);
+
+  if (!chartResponse.ok) {
+    throw new Error(`Yahoo Finance chart request failed with status ${chartResponse.status}`);
+  }
+
+  const chartPayload = await chartResponse.json();
+  const result = chartPayload.chart?.result?.[0];
+  const quote = result?.indicators?.quote?.[0] || {};
+  const timestamps = result?.timestamp || [];
+  const closes = (quote.close || []).filter(value => typeof value === 'number');
+  const volumes = (quote.volume || []).filter(value => typeof value === 'number');
+  const currentPrice = typeof result?.meta?.regularMarketPrice === 'number'
+    ? result.meta.regularMarketPrice
+    : closes[closes.length - 1];
+
+  if (typeof currentPrice !== 'number' || !closes.length) {
+    throw new Error(`Could not build price context for ticker ${ticker}.`);
+  }
+
+  let headlines = [];
+  if (newsResponse.ok) {
+    const newsPayload = await newsResponse.json();
+    headlines = (newsPayload.news || [])
+      .map(item => ({
+        title: item.title,
+        publisher: item.publisher,
+        publishedAt: item.providerPublishTime
+          ? new Date(item.providerPublishTime * 1000).toISOString()
+          : null
+      }))
+      .filter(item => item.title);
+  }
+
+  const previousClose = getCloseAtOffset(closes, 1);
+  const monthClose = getCloseAtOffset(closes, 21);
+  const quarterClose = getCloseAtOffset(closes, 63);
+  const averageVolume = volumes.length
+    ? volumes.reduce((sum, volume) => sum + volume, 0) / volumes.length
+    : null;
+
+  return {
+    ticker,
+    currentPrice,
+    previousClose,
+    oneDayChangePercent: percentChange(currentPrice, previousClose),
+    oneMonthChangePercent: percentChange(currentPrice, monthClose),
+    threeMonthChangePercent: percentChange(currentPrice, quarterClose),
+    averageVolume,
+    firstPriceDate: timestamps[0] ? new Date(timestamps[0] * 1000).toISOString().slice(0, 10) : null,
+    lastPriceDate: timestamps[timestamps.length - 1] ? new Date(timestamps[timestamps.length - 1] * 1000).toISOString().slice(0, 10) : null,
+    recentHeadlines: headlines
+  };
+}
+
+app.get('/api/ai-insight', async (req, res) => {
+  const ticker = (req.query.ticker || '').trim().toUpperCase();
+  if (!ticker) {
+    return res.status(400).json({ error: 'Ticker symbol is required.' });
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server.' });
+  }
+
+  try {
+    const context = await fetchTickerInsightContext(ticker);
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+        instructions: [
+          'You are a concise equity research assistant for a stock dashboard.',
+          'Use only the supplied JSON context. Do not invent fundamentals, ratings, or events.',
+          'Avoid investment advice. Frame outputs as research observations, not buy/sell instructions.'
+        ].join(' '),
+        input: `Create a ticker insight from this context:\n${JSON.stringify(context, null, 2)}`,
+        max_output_tokens: 900,
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'ticker_insight',
+            strict: true,
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['summary', 'setup', 'bullCase', 'bearCase', 'watchItems', 'riskNote'],
+              properties: {
+                summary: { type: 'string' },
+                setup: { type: 'string' },
+                bullCase: {
+                  type: 'array',
+                  minItems: 2,
+                  maxItems: 4,
+                  items: { type: 'string' }
+                },
+                bearCase: {
+                  type: 'array',
+                  minItems: 2,
+                  maxItems: 4,
+                  items: { type: 'string' }
+                },
+                watchItems: {
+                  type: 'array',
+                  minItems: 2,
+                  maxItems: 4,
+                  items: { type: 'string' }
+                },
+                riskNote: { type: 'string' }
+              }
+            }
+          }
+        }
+      })
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: payload.error?.message || `OpenAI request failed with status ${response.status}`
+      });
+    }
+
+    const text = extractOpenAIText(payload);
+    const insight = JSON.parse(text);
+    return res.json({
+      ticker,
+      generatedAt: new Date().toISOString(),
+      insight
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Unknown error while generating AI insight.' });
   }
 });
 
