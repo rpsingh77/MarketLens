@@ -1595,6 +1595,7 @@ button:active {
 }
 
 .ai-panel {
+  border: 0;
   height: 100%;
   min-height: 0;
   overflow: auto;
@@ -1634,7 +1635,7 @@ button:active {
 
 .ai-card,
 .ai-empty {
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--muted-strong);
@@ -1680,7 +1681,7 @@ button:active {
 .ai-target-level {
   min-width: 0;
   padding: 10px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   background: var(--panel-soft);
 }
