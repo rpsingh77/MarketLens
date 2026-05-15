@@ -406,6 +406,53 @@ app.get('/api/market-news', async (req, res) => {
   }
 });
 
+app.get('/api/market-summary', async (req, res) => {
+  const symbols = ['^GSPC', '^IXIC', '^DJI', '^VIX', '^TNX', 'CL=F', 'GC=F', 'BTC-USD'];
+  const labels = {
+    '^GSPC': 'S&P 500',
+    '^IXIC': 'Nasdaq',
+    '^DJI': 'Dow',
+    '^VIX': 'VIX',
+    '^TNX': '10Y Yield',
+    'CL=F': 'Oil',
+    'GC=F': 'Gold',
+    'BTC-USD': 'Bitcoin'
+  };
+
+  try {
+    const quotes = (await Promise.all(symbols.map(async symbol => {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
+      const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!response.ok) return null;
+
+      const payload = await response.json();
+      const result = payload.chart?.result?.[0];
+      const closes = (result?.indicators?.quote?.[0]?.close || []).filter(value => typeof value === 'number');
+      const price = typeof result?.meta?.regularMarketPrice === 'number'
+        ? result.meta.regularMarketPrice
+        : closes[closes.length - 1];
+      const previous = closes.length > 1 ? closes[closes.length - 2] : result?.meta?.previousClose;
+
+      if (typeof price !== 'number') return null;
+
+      const change = typeof previous === 'number' ? price - previous : null;
+      const changePercent = typeof previous === 'number' && previous !== 0 ? (change / previous) * 100 : null;
+
+      return {
+        symbol,
+        label: labels[symbol] || symbol,
+        price,
+        change,
+        changePercent
+      };
+    }))).filter(Boolean);
+
+    return res.json({ quotes });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Unknown error while fetching market summary.' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
 });

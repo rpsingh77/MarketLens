@@ -18,6 +18,7 @@ const indicatorToggles = document.querySelectorAll('.indicator-toggle');
 const chartFrame = document.getElementById('chart-frame');
 const macdPane = document.getElementById('macd-pane');
 const rsiPane = document.getElementById('rsi-pane');
+const rsiLatestValue = document.getElementById('rsi-latest-value');
 const optionsTitle = document.getElementById('options-title');
 const optionsExpirySelect = document.getElementById('options-expiry-select');
 const optionsStatus = document.getElementById('options-status');
@@ -25,15 +26,10 @@ const optionsChainBody = document.getElementById('options-chain-body');
 const newsTitle = document.getElementById('news-title');
 const newsStatus = document.getElementById('news-status');
 const newsItems = document.getElementById('news-items');
+const marketSummaryStatus = document.getElementById('market-summary-status');
+const marketSummaryItems = document.getElementById('market-summary-items');
 const marketNewsStatus = document.getElementById('market-news-status');
 const marketNewsItems = document.getElementById('market-news-items');
-const marketNewsBrowserFrame = document.getElementById('market-news-browser-frame');
-const marketNewsBrowserEmpty = document.getElementById('market-news-browser-empty');
-const marketNewsUrl = document.getElementById('market-news-url');
-const marketNewsBack = document.getElementById('market-news-back');
-const marketNewsForward = document.getElementById('market-news-forward');
-const marketNewsRefresh = document.getElementById('market-news-refresh');
-const marketNewsOpen = document.getElementById('market-news-open');
 const workspace = document.querySelector('.workspace');
 const watchlistToggle = document.getElementById('watchlist-toggle');
 const watchlistForm = document.getElementById('watchlist-form');
@@ -587,17 +583,50 @@ function setMarketNewsStatus(message, isError = false) {
   marketNewsStatus.classList.toggle('error', isError);
 }
 
-function openMarketNewsArticle(article) {
-  if (!marketNewsBrowserFrame || !marketNewsUrl || !marketNewsOpen) return;
-
-  marketNewsBrowserFrame.src = article.link;
-  marketNewsUrl.value = article.link;
-  marketNewsOpen.href = article.link;
-  marketNewsOpen.hidden = false;
-  if (marketNewsBrowserEmpty) marketNewsBrowserEmpty.hidden = true;
+function setMarketSummaryStatus(message, isError = false) {
+  if (!marketSummaryStatus) return;
+  marketSummaryStatus.textContent = message;
+  marketSummaryStatus.classList.toggle('error', isError);
 }
 
-function createNewsCard(article, { browserControl = false } = {}) {
+function formatMarketValue(value, symbol) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
+  if (symbol === 'BTC-USD' || symbol === 'CL=F' || symbol === 'GC=F') {
+    return formatCurrency(value);
+  }
+  if (symbol === '^TNX') {
+    return `${value.toFixed(2)}%`;
+  }
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: value >= 1000 ? 0 : 2
+  }).format(value);
+}
+
+function renderMarketSummary(quotes) {
+  if (!marketSummaryItems) return;
+  marketSummaryItems.textContent = '';
+
+  if (!quotes.length) {
+    marketSummaryItems.innerHTML = '<div class="news-empty">Market summary unavailable.</div>';
+    return;
+  }
+
+  quotes.forEach(quote => {
+    const change = typeof quote.change === 'number' ? quote.change : null;
+    const changePercent = typeof quote.changePercent === 'number' ? quote.changePercent : null;
+    const direction = change == null ? 'neutral' : change >= 0 ? 'positive' : 'negative';
+    const card = document.createElement('article');
+    card.className = `market-summary-card ${direction}`;
+    card.innerHTML = `
+      <span>${quote.label}</span>
+      <strong>${formatMarketValue(quote.price, quote.symbol)}</strong>
+      <small>${change == null ? '--' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}`} ${changePercent == null ? '' : `(${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%)`}</small>
+    `;
+    marketSummaryItems.append(card);
+  });
+}
+
+function createNewsCard(article) {
   const card = document.createElement('article');
   card.className = 'news-card';
 
@@ -610,14 +639,6 @@ function createNewsCard(article, { browserControl = false } = {}) {
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
   link.textContent = article.title;
-
-  if (browserControl) {
-    link.removeAttribute('target');
-    link.addEventListener('click', event => {
-      event.preventDefault();
-      openMarketNewsArticle(article);
-    });
-  }
 
   card.append(meta, link);
   return card;
@@ -648,10 +669,8 @@ function renderMarketNews(articles) {
   }
 
   articles.forEach(article => {
-    marketNewsItems.append(createNewsCard(article, { browserControl: true }));
+    marketNewsItems.append(createNewsCard(article));
   });
-
-  openMarketNewsArticle(articles[0]);
 }
 
 async function fetchNews(ticker) {
@@ -688,6 +707,24 @@ async function fetchMarketNews() {
   } catch (error) {
     marketNewsItems.innerHTML = '<div class="news-empty">Market news unavailable.</div>';
     setMarketNewsStatus(error.message, true);
+  }
+}
+
+async function fetchMarketSummary() {
+  if (!marketSummaryItems) return;
+  setMarketSummaryStatus('Loading market summary...');
+  try {
+    const res = await fetch('/api/market-summary');
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload.error || 'Failed to fetch market summary.');
+    }
+
+    renderMarketSummary(payload.quotes || []);
+    setMarketSummaryStatus('');
+  } catch (error) {
+    marketSummaryItems.innerHTML = '<div class="news-empty">Market summary unavailable.</div>';
+    setMarketSummaryStatus(error.message, true);
   }
 }
 
@@ -821,6 +858,12 @@ function updateSummary(formatted, ticker) {
 
 function getLatestValue(values) {
   return values.findLast(value => value != null);
+}
+
+function updateRsiValue(rsiValues) {
+  if (!rsiLatestValue) return;
+  const latestRsi = getLatestValue(rsiValues);
+  rsiLatestValue.textContent = typeof latestRsi === 'number' ? latestRsi.toFixed(1) : '--';
 }
 
 function getTechnicalRating(scoreRatio) {
@@ -1132,6 +1175,7 @@ function createChart(data, ticker) {
   updateSummary(formatted, ticker);
   updateSuggestion(technicalSignal);
   updateGauge(technicalSignal);
+  updateRsiValue(rsi);
 
   ensureChart();
   candleSeries.setData(formatted.map(point => ({
@@ -1232,34 +1276,6 @@ document.addEventListener('click', event => {
   }
 });
 
-if (marketNewsBack) {
-  marketNewsBack.addEventListener('click', () => {
-    try {
-      marketNewsBrowserFrame?.contentWindow?.history.back();
-    } catch (error) {
-      // Cross-origin frames may deny history access.
-    }
-  });
-}
-
-if (marketNewsForward) {
-  marketNewsForward.addEventListener('click', () => {
-    try {
-      marketNewsBrowserFrame?.contentWindow?.history.forward();
-    } catch (error) {
-      // Cross-origin frames may deny history access.
-    }
-  });
-}
-
-if (marketNewsRefresh) {
-  marketNewsRefresh.addEventListener('click', () => {
-    if (marketNewsBrowserFrame?.src) {
-      marketNewsBrowserFrame.src = marketNewsBrowserFrame.src;
-    }
-  });
-}
-
 optionsExpirySelect.addEventListener('change', () => {
   fetchOptionChain(currentTicker, optionsExpirySelect.value);
 });
@@ -1275,6 +1291,7 @@ window.addEventListener('DOMContentLoaded', () => {
   applyTheme(getSavedTheme());
   renderWatchlist();
   refreshWatchlistPrices();
+  fetchMarketSummary();
   fetchMarketNews();
   fetchOhlc('AAPL');
 });

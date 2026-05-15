@@ -57,7 +57,7 @@
           <button id="watchlist-tab" class="workspace-tab active" type="button" role="tab" aria-selected="true" aria-controls="watchlist-panel" data-tab="watchlist">Watchlist</button>
           <button id="chart-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="chart-panel" data-tab="chart">Chart</button>
           <button id="options-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="options-panel" data-tab="options">Option Chain</button>
-          <button id="market-news-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="market-news-panel" data-tab="market-news">Market News</button>
+          <button id="market-news-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="market-news-panel" data-tab="market-news">Headlines</button>
         </div>
 
         <section id="chart-panel" class="chart-panel tab-panel" role="tabpanel" aria-labelledby="chart-tab" hidden>
@@ -113,7 +113,7 @@
               <div id="macd-chart"></div>
             </div>
             <div id="rsi-pane" class="indicator-pane">
-              <span>RSI</span>
+              <span>RSI <strong id="rsi-latest-value">--</strong></span>
               <div id="rsi-chart"></div>
             </div>
           </div>
@@ -222,25 +222,18 @@
         <section id="market-news-panel" class="market-news-panel tab-panel" role="tabpanel" aria-labelledby="market-news-tab" hidden>
           <div class="market-news-panel-header">
             <div>
-              <p class="eyebrow">Market News</p>
-              <h2>Latest market headlines</h2>
+              <p class="eyebrow">Headlines</p>
+              <h2>Market summary</h2>
             </div>
           </div>
-          <div id="market-news-status" class="news-status">Loading market news...</div>
-          <div class="market-news-browser-layout">
-            <div id="market-news-items" class="news-grid market-news-grid"></div>
-            <aside class="market-news-browser" aria-label="Market news browser">
-              <div class="market-news-browser-toolbar">
-                <button id="market-news-back" class="browser-control-button" type="button" aria-label="Back">‹</button>
-                <button id="market-news-forward" class="browser-control-button" type="button" aria-label="Forward">›</button>
-                <button id="market-news-refresh" class="browser-control-button" type="button" aria-label="Reload">↻</button>
-                <input id="market-news-url" type="text" readonly aria-label="Selected article URL" placeholder="Select a headline to open it here" />
-                <a id="market-news-open" class="browser-open-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Open</a>
-              </div>
-              <iframe id="market-news-browser-frame" title="Market news browser"></iframe>
-              <div id="market-news-browser-empty" class="news-empty">Select a headline to open it in the browser.</div>
-            </aside>
+          <div id="market-summary-status" class="news-status">Loading market summary...</div>
+          <div id="market-summary-items" class="market-summary-grid"></div>
+          <div class="market-news-section-header">
+            <p class="eyebrow">Market News</p>
+            <h2>Latest headlines</h2>
           </div>
+          <div id="market-news-status" class="news-status">Loading market news...</div>
+          <div id="market-news-items" class="news-grid market-news-grid"></div>
         </section>
       </div>
     </div>
