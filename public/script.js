@@ -611,9 +611,6 @@ function formatMarketValue(value, symbol) {
   if (symbol === 'BTC-USD') {
     return formatCurrency(value);
   }
-  if (symbol === '^TNX') {
-    return `${value.toFixed(2)}%`;
-  }
   return new Intl.NumberFormat('en-US', {
     maximumFractionDigits: value >= 1000 ? 0 : 2
   }).format(value);
@@ -748,6 +745,7 @@ async function fetchMarketSummary() {
 function renderAiInsight(payload) {
   if (!aiContent) return;
   const insight = payload.insight || {};
+  const targetLevels = insight.targetLevels || {};
   const sections = [
     ['Setup', insight.setup],
     ['Bull Case', insight.bullCase],
@@ -765,6 +763,35 @@ function renderAiInsight(payload) {
     <strong>${insight.summary || 'No summary returned.'}</strong>
   `;
   aiContent.append(summaryCard);
+
+  const targetsCard = document.createElement('section');
+  targetsCard.className = 'ai-card ai-targets-card';
+  const targetsTitle = document.createElement('h3');
+  targetsTitle.textContent = 'Target Levels';
+  targetsCard.append(targetsTitle);
+
+  const targetGrid = document.createElement('div');
+  targetGrid.className = 'ai-target-grid';
+  [
+    ['Price Target', targetLevels.priceTarget],
+    ['Buy Target', targetLevels.buyTarget],
+    ['Sell Target', targetLevels.sellTarget]
+  ].forEach(([label, level]) => {
+    const item = document.createElement('div');
+    item.className = 'ai-target-level';
+
+    const labelEl = document.createElement('span');
+    labelEl.textContent = label;
+    const priceEl = document.createElement('strong');
+    priceEl.textContent = typeof level?.price === 'number' ? formatCurrency(level.price) : '--';
+    const rationaleEl = document.createElement('p');
+    rationaleEl.textContent = level?.rationale || '--';
+
+    item.append(labelEl, priceEl, rationaleEl);
+    targetGrid.append(item);
+  });
+  targetsCard.append(targetGrid);
+  aiContent.append(targetsCard);
 
   sections.forEach(([title, value]) => {
     const card = document.createElement('section');

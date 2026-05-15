@@ -430,14 +430,13 @@ app.get('/api/market-news', async (req, res) => {
 });
 
 app.get('/api/market-summary', async (req, res) => {
-  const symbols = ['^GSPC', '^IXIC', '^DJI', 'AAPL', '^VIX', '^TNX', 'BTC-USD'];
+  const symbols = ['^GSPC', '^IXIC', '^DJI', 'AAPL', '^VIX', 'BTC-USD'];
   const labels = {
     '^GSPC': 'S&P 500',
     '^IXIC': 'Nasdaq',
     '^DJI': 'Dow',
     AAPL: 'Apple',
     '^VIX': 'VIX',
-    '^TNX': '10Y Yield',
     'BTC-USD': 'Bitcoin'
   };
 
@@ -551,6 +550,8 @@ async function fetchTickerInsightContext(ticker) {
   const previousClose = getCloseAtOffset(closes, 1);
   const monthClose = getCloseAtOffset(closes, 21);
   const quarterClose = getCloseAtOffset(closes, 63);
+  const recentCloses = closes.slice(-20);
+  const quarterCloses = closes.slice(-63);
   const averageVolume = volumes.length
     ? volumes.reduce((sum, volume) => sum + volume, 0) / volumes.length
     : null;
@@ -562,6 +563,10 @@ async function fetchTickerInsightContext(ticker) {
     oneDayChangePercent: percentChange(currentPrice, previousClose),
     oneMonthChangePercent: percentChange(currentPrice, monthClose),
     threeMonthChangePercent: percentChange(currentPrice, quarterClose),
+    twentyDayCloseHigh: recentCloses.length ? Math.max(...recentCloses) : null,
+    twentyDayCloseLow: recentCloses.length ? Math.min(...recentCloses) : null,
+    threeMonthCloseHigh: quarterCloses.length ? Math.max(...quarterCloses) : null,
+    threeMonthCloseLow: quarterCloses.length ? Math.min(...quarterCloses) : null,
     averageVolume,
     firstPriceDate: timestamps[0] ? new Date(timestamps[0] * 1000).toISOString().slice(0, 10) : null,
     lastPriceDate: timestamps[timestamps.length - 1] ? new Date(timestamps[timestamps.length - 1] * 1000).toISOString().slice(0, 10) : null,
@@ -593,7 +598,8 @@ app.get('/api/ai-insight', async (req, res) => {
         instructions: [
           'You are a concise equity research assistant for a stock dashboard.',
           'Use only the supplied JSON context. Do not invent fundamentals, ratings, or events.',
-          'Avoid investment advice. Frame outputs as research observations, not buy/sell instructions.'
+          'Avoid investment advice. Frame outputs as research observations, not buy/sell instructions.',
+          'For targetLevels, provide priceTarget, buyTarget, and sellTarget as technical watch levels derived from the supplied price context.'
         ].join(' '),
         input: `Create a ticker insight from this context:\n${JSON.stringify(context, null, 2)}`,
         max_output_tokens: 900,
@@ -605,10 +611,44 @@ app.get('/api/ai-insight', async (req, res) => {
             schema: {
               type: 'object',
               additionalProperties: false,
-              required: ['summary', 'setup', 'bullCase', 'bearCase', 'watchItems', 'riskNote'],
+              required: ['summary', 'setup', 'targetLevels', 'bullCase', 'bearCase', 'watchItems', 'riskNote'],
               properties: {
                 summary: { type: 'string' },
                 setup: { type: 'string' },
+                targetLevels: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['priceTarget', 'buyTarget', 'sellTarget'],
+                  properties: {
+                    priceTarget: {
+                      type: 'object',
+                      additionalProperties: false,
+                      required: ['price', 'rationale'],
+                      properties: {
+                        price: { type: 'number' },
+                        rationale: { type: 'string' }
+                      }
+                    },
+                    buyTarget: {
+                      type: 'object',
+                      additionalProperties: false,
+                      required: ['price', 'rationale'],
+                      properties: {
+                        price: { type: 'number' },
+                        rationale: { type: 'string' }
+                      }
+                    },
+                    sellTarget: {
+                      type: 'object',
+                      additionalProperties: false,
+                      required: ['price', 'rationale'],
+                      properties: {
+                        price: { type: 'number' },
+                        rationale: { type: 'string' }
+                      }
+                    }
+                  }
+                },
                 bullCase: {
                   type: 'array',
                   minItems: 2,

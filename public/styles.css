@@ -1649,6 +1649,10 @@ button:active {
   background: var(--highlight-surface);
 }
 
+.ai-targets-card {
+  grid-column: 1 / -1;
+}
+
 .ai-card span,
 .ai-card h3 {
   display: block;
@@ -1665,6 +1669,32 @@ button:active {
   color: var(--text);
   font-size: 1rem;
   line-height: 1.45;
+}
+
+.ai-target-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ai-target-level {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+}
+
+.ai-target-level span {
+  margin-bottom: 6px;
+}
+
+.ai-target-level strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 900;
 }
 
 .ai-card ul {
@@ -1966,6 +1996,10 @@ button:active {
   }
 
   .ai-content {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-target-grid {
     grid-template-columns: 1fr;
   }
 
