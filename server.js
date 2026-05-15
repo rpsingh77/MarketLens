@@ -92,6 +92,7 @@ app.get('/api/ohlc', async (req, res) => {
       return res.status(404).json({ error: `Could not fetch data for ticker ${ticker}.` });
     }
 
+    const meta = result.meta || {};
     const timestamps = result.timestamp || [];
     const quote = result.indicators?.quote?.[0];
     if (!quote || !quote.open || !quote.high || !quote.low || !quote.close) {
@@ -106,9 +107,47 @@ app.get('/api/ohlc', async (req, res) => {
       close: quote.close[index]
     })).filter(point => point.open != null && point.high != null && point.low != null && point.close != null);
 
-    return res.json({ ticker, data });
+    return res.json({
+      ticker,
+      name: meta.shortName || meta.longName || meta.instrumentInfo?.shortName || ticker,
+      data
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Unknown error while fetching data.' });
+  }
+});
+
+app.get('/api/intraday', async (req, res) => {
+  const ticker = (req.query.ticker || '').trim().toUpperCase();
+  if (!ticker) {
+    return res.status(400).json({ error: 'Ticker symbol is required.' });
+  }
+
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1d&interval=5m`;
+  try {
+    const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Yahoo Finance intraday request failed with status ${response.status}` });
+    }
+
+    const payload = await response.json();
+    const result = payload.chart?.result?.[0];
+    const error = payload.chart?.error;
+    const timestamps = result?.timestamp || [];
+    const quote = result?.indicators?.quote?.[0];
+
+    if (error || !result || !quote?.close) {
+      return res.status(404).json({ error: `Could not fetch intraday data for ticker ${ticker}.` });
+    }
+
+    const data = timestamps.map((timestamp, index) => ({
+      time: new Date(timestamp * 1000).toISOString(),
+      close: quote.close[index]
+    })).filter(point => typeof point.close === 'number');
+
+    return res.json({ ticker, data });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Unknown error while fetching intraday data.' });
   }
 });
 

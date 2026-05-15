@@ -97,6 +97,9 @@ let watchlistPrices = {};
 let watchlistDirections = {};
 let watchlistChanges = {};
 let watchlistRecommendations = {};
+let watchlistNames = {};
+let watchlistSparklineData = {};
+let watchlistThirtyDaySparklineData = {};
 let lastAiTicker = '';
 
 function showStatus(message, isError = false) {
@@ -324,17 +327,88 @@ function applyTheme(theme) {
   requestAnimationFrame(applyChartTheme);
 }
 
+function moveWatchlistSymbol(symbol, direction) {
+  const currentIndex = watchlist.indexOf(symbol);
+  const nextIndex = currentIndex + direction;
+  if (currentIndex === -1 || nextIndex < 0 || nextIndex >= watchlist.length) return;
+
+  [watchlist[currentIndex], watchlist[nextIndex]] = [watchlist[nextIndex], watchlist[currentIndex]];
+  saveWatchlist();
+  renderWatchlist();
+}
+
+function createSparklineSvg(values, direction) {
+  const points = (values || []).filter(value => typeof value === 'number' && Number.isFinite(value));
+  if (points.length < 2) {
+    return '<span class="watchlist-sparkline-empty"></span>';
+  }
+
+  const width = 58;
+  const height = 24;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const path = points.map((value, index) => {
+    const x = (index / (points.length - 1)) * width;
+    const y = height - (((value - min) / range) * (height - 4)) - 2;
+    return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(' ');
+  const className = direction === 'down' ? 'negative' : direction === 'up' ? 'positive' : 'neutral';
+
+  return `
+    <svg class="watchlist-sparkline ${className}" viewBox="0 0 ${width} ${height}" aria-hidden="true" focusable="false">
+      <path d="${path}" />
+    </svg>
+  `;
+}
+
+async function fetchIntradaySparkline(symbol) {
+  const params = new URLSearchParams({ ticker: symbol });
+  const res = await fetch(`/api/intraday?${params.toString()}`);
+  const payload = await res.json();
+  if (!res.ok || !payload.data?.length) {
+    throw new Error(payload.error || 'Failed to fetch intraday data.');
+  }
+  return payload.data.map(point => point.close);
+}
+
 function renderWatchlist() {
   watchlistItems.textContent = '';
 
-  watchlist.forEach(symbol => {
+  watchlist.forEach((symbol, index) => {
     const price = watchlistPrices[symbol];
     const direction = watchlistDirections[symbol];
     const change = watchlistChanges[symbol];
     const recommendation = watchlistRecommendations[symbol];
+    const companyName = watchlistNames[symbol] || symbol;
+    const intradaySparkline = createSparklineSvg(watchlistSparklineData[symbol], direction);
+    const thirtyDaySparkline = createSparklineSvg(watchlistThirtyDaySparklineData[symbol], direction);
     const item = document.createElement('div');
     item.className = 'watchlist-item';
     item.classList.toggle('active', symbol === currentTicker);
+
+    const reorderControls = document.createElement('div');
+    reorderControls.className = 'watchlist-reorder';
+
+    const upButton = document.createElement('button');
+    upButton.type = 'button';
+    upButton.setAttribute('aria-label', `Move ${symbol} up`);
+    upButton.disabled = index === 0;
+    upButton.textContent = '↑';
+    upButton.addEventListener('click', () => {
+      moveWatchlistSymbol(symbol, -1);
+    });
+
+    const downButton = document.createElement('button');
+    downButton.type = 'button';
+    downButton.setAttribute('aria-label', `Move ${symbol} down`);
+    downButton.disabled = index === watchlist.length - 1;
+    downButton.textContent = '↓';
+    downButton.addEventListener('click', () => {
+      moveWatchlistSymbol(symbol, 1);
+    });
+
+    reorderControls.append(upButton, downButton);
 
     const loadButton = document.createElement('button');
     loadButton.className = 'watchlist-symbol';
@@ -344,7 +418,12 @@ function renderWatchlist() {
     const recommendationText = WATCHLIST_RECOMMENDATION_LABELS[recommendation?.label] || recommendation?.label || '--';
     const recommendationClass = recommendation?.recommendationClass || 'neutral';
     loadButton.innerHTML = `
-      <span class="watchlist-ticker">${symbol}</span>
+      <span class="watchlist-identity">
+        <span class="watchlist-ticker">${symbol}</span>
+        <span class="watchlist-company">${companyName}</span>
+      </span>
+      <span class="watchlist-sparkline-wrap">${thirtyDaySparkline}</span>
+      <span class="watchlist-sparkline-wrap">${intradaySparkline}</span>
       <span class="watchlist-price">${price ? formatCurrency(price) : '--'}</span>
       <span class="watchlist-change">${changeValueText}</span>
       <span class="watchlist-change-percent">${changePercentText}</span>
@@ -376,7 +455,7 @@ function renderWatchlist() {
       renderWatchlist();
     });
 
-    item.append(loadButton, removeButton);
+    item.append(reorderControls, loadButton, removeButton);
     watchlistItems.append(item);
   });
 }
@@ -392,6 +471,13 @@ async function refreshWatchlistPrices() {
         if (!res.ok || !payload.data.length) return;
         const last = payload.data[payload.data.length - 1];
         const previous = payload.data[payload.data.length - 2];
+        watchlistNames[symbol] = payload.name || symbol;
+        watchlistThirtyDaySparklineData[symbol] = payload.data.slice(-30).map(point => point.close);
+        try {
+          watchlistSparklineData[symbol] = await fetchIntradaySparkline(symbol);
+        } catch (sparklineError) {
+          watchlistSparklineData[symbol] = null;
+        }
         watchlistPrices[symbol] = last.close;
         if (previous) {
           const change = last.close - previous.close;
@@ -407,6 +493,9 @@ async function refreshWatchlistPrices() {
         watchlistDirections[symbol] = null;
         watchlistChanges[symbol] = null;
         watchlistRecommendations[symbol] = null;
+        watchlistNames[symbol] = symbol;
+        watchlistSparklineData[symbol] = null;
+        watchlistThirtyDaySparklineData[symbol] = null;
       }
     }));
     renderWatchlist();
@@ -1353,6 +1442,13 @@ async function fetchOhlc(ticker) {
       throw new Error('No OHLC data returned for this ticker.');
     }
     const visibleDays = createChart(payload.data, payload.ticker);
+    watchlistNames[payload.ticker] = payload.name || payload.ticker;
+    watchlistThirtyDaySparklineData[payload.ticker] = payload.data.slice(-30).map(point => point.close);
+    try {
+      watchlistSparklineData[payload.ticker] = await fetchIntradaySparkline(payload.ticker);
+    } catch (sparklineError) {
+      watchlistSparklineData[payload.ticker] = null;
+    }
     fetchOptionChain(payload.ticker);
     fetchNews(payload.ticker);
     fetchAnalystSummary(payload.ticker);
