@@ -741,7 +741,7 @@ function renderMarketSummary(quotes) {
     const card = document.createElement('article');
     card.className = `market-summary-card ${direction}`;
     card.innerHTML = `
-      <span>${quote.label}</span>
+      <span>${quote.symbol || quote.label || '--'}</span>
       <strong>${formatMarketValue(quote.price, quote.symbol)}</strong>
       <small>${change == null ? '--' : `${change >= 0 ? '+' : ''}${change.toFixed(2)}`} ${changePercent == null ? '' : `(${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%)`}</small>
     `;
@@ -833,11 +833,13 @@ async function fetchMarketNews() {
   }
 }
 
-async function fetchMarketSummary() {
+async function fetchMarketSummary(ticker = currentTicker) {
   if (!marketSummaryItems) return;
+  const normalizedTicker = normalizeTicker(ticker) || 'AAPL';
   setMarketSummaryStatus('Loading market summary...');
   try {
-    const res = await fetch('/api/market-summary');
+    const params = new URLSearchParams({ ticker: normalizedTicker });
+    const res = await fetch(`/api/market-summary?${params.toString()}`);
     const payload = await res.json();
     if (!res.ok) {
       throw new Error(payload.error || 'Failed to fetch market summary.');
@@ -1552,10 +1554,11 @@ async function fetchOhlc(ticker) {
     } catch (sparklineError) {
       watchlistSparklineData[payload.ticker] = null;
     }
+    currentTicker = payload.ticker;
+    fetchMarketSummary(currentTicker);
     fetchOptionChain(payload.ticker);
     fetchNews(payload.ticker);
     fetchAnalystSummary(payload.ticker);
-    currentTicker = payload.ticker;
     if (aiTitle) aiTitle.textContent = `${payload.ticker} insight`;
     if (optionInsightTitle) optionInsightTitle.textContent = `${payload.ticker} option insight`;
     if (!document.getElementById('ai-panel')?.hidden) {
@@ -1575,6 +1578,7 @@ async function fetchOhlc(ticker) {
         percent: (change / previous.close) * 100
       };
     }
+
     renderWatchlist();
     showStatus('', false);
   } catch (error) {
@@ -1641,7 +1645,7 @@ window.addEventListener('DOMContentLoaded', () => {
   applyTheme(getSavedTheme());
   renderWatchlist();
   refreshWatchlistPrices();
-  fetchMarketSummary();
+  fetchMarketSummary(currentTicker);
   fetchMarketNews();
   fetchOhlc('AAPL');
 });

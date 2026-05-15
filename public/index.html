@@ -53,6 +53,13 @@
 
     <div class="workspace">
       <div class="primary-content">
+        <section class="market-summary-top" aria-label="Market summary">
+          <section class="market-summary-panel" aria-label="Market summary">
+            <div id="market-summary-status" class="news-status">Loading market summary...</div>
+            <div id="market-summary-items" class="market-summary-grid"></div>
+          </section>
+        </section>
+
         <div class="workspace-tabs" role="tablist" aria-label="Dashboard views">
           <button id="market-news-tab" class="workspace-tab active" type="button" role="tab" aria-selected="true" aria-controls="market-news-panel" data-tab="market-news">Headlines</button>
           <button id="watchlist-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="watchlist-panel" data-tab="watchlist">Watchlist</button>
@@ -176,7 +183,6 @@
             <section class="news-panel" aria-label="Market news">
               <div class="news-panel-header">
                 <div>
-                  <p class="eyebrow">Market News</p>
                   <h2 id="news-title">AAPL news</h2>
                 </div>
               </div>
@@ -254,17 +260,8 @@
         <section id="market-news-panel" class="market-news-panel tab-panel active" role="tabpanel" aria-labelledby="market-news-tab">
           <div class="market-news-panel-header">
             <div>
-              <p class="eyebrow">Headlines</p>
-              <h2>Market summary</h2>
+              <h2>Latest news</h2>
             </div>
-          </div>
-          <section class="market-summary-panel" aria-label="Market summary">
-            <div id="market-summary-status" class="news-status">Loading market summary...</div>
-            <div id="market-summary-items" class="market-summary-grid"></div>
-          </section>
-          <div class="market-news-section-header">
-            <p class="eyebrow">Market News</p>
-            <h2>Latest headlines</h2>
           </div>
           <div id="market-news-status" class="news-status">Loading market news...</div>
           <div id="market-news-items" class="news-grid market-news-grid"></div>

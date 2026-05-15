@@ -556,7 +556,10 @@ app.get('/api/market-news', async (req, res) => {
 });
 
 app.get('/api/market-summary', async (req, res) => {
-  const symbols = ['^GSPC', '^IXIC', '^DJI', 'AAPL', '^VIX', 'BTC-USD'];
+  const requestedTicker = (req.query.ticker || 'AAPL').trim().toUpperCase();
+  const focusTicker = requestedTicker || 'AAPL';
+  const symbols = ['^GSPC', '^IXIC', '^DJI', focusTicker, '^VIX', 'BTC-USD']
+    .filter((symbol, index, list) => list.indexOf(symbol) === index);
   const labels = {
     '^GSPC': 'S&P 500',
     '^IXIC': 'Nasdaq',
@@ -584,10 +587,11 @@ app.get('/api/market-summary', async (req, res) => {
 
       const change = typeof previous === 'number' ? price - previous : null;
       const changePercent = typeof previous === 'number' && previous !== 0 ? (change / previous) * 100 : null;
+      const dynamicLabel = result?.meta?.shortName || result?.meta?.longName || result?.meta?.symbol;
 
       return {
         symbol,
-        label: labels[symbol] || symbol,
+        label: labels[symbol] || dynamicLabel || symbol,
         price,
         change,
         changePercent

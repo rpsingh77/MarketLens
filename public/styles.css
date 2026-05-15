@@ -346,7 +346,7 @@ h2 {
   justify-content: space-between;
   gap: 18px;
   min-height: 70px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--line);
 }
@@ -436,7 +436,7 @@ h2 {
   gap: 0;
   height: calc(100vh - var(--dashboard-shell-offset));
   min-height: 660px;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .workspace.watchlist-collapsed {
@@ -875,10 +875,11 @@ button:active {
   grid-area: sentiment;
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
-  gap: 8px;
+  row-gap: 0;
+  column-gap: 0;
   align-items: stretch;
   padding: 10px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   background: var(--panel-soft);
 }
@@ -890,6 +891,7 @@ button:active {
   justify-content: flex-start;
   gap: 8px;
   min-width: 0;
+  padding-bottom: 8px;
 }
 
 .sentiment-heading h2 {
@@ -918,6 +920,7 @@ button:active {
 .sentiment-panel .signal-gauge {
   gap: 4px;
   padding: 6px 8px;
+  border-radius: 0;
 }
 
 .sentiment-panel .gauge-dial {
@@ -931,20 +934,26 @@ button:active {
 .sentiment-panel .stock-suggestion {
   display: flex;
   align-items: center;
+  border-radius: 0;
 }
 
 .analyst-summary {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 0;
   padding: 7px 8px;
-  border-radius: var(--radius);
+  border-radius: 0;
   background: var(--surface);
 }
 
 .analyst-summary span {
   min-width: 0;
+  padding: 0 6px;
+}
+
+.analyst-summary span + span {
+  border-left: 1px solid var(--line);
 }
 
 .analyst-summary small,
@@ -1248,6 +1257,12 @@ button:active {
   text-align: left;
   font-size: 0.74rem;
   font-weight: 800;
+}
+
+.watchlist-symbol:hover,
+.watchlist-symbol:active {
+  filter: none;
+  transform: none;
 }
 
 .watchlist-reorder {
@@ -1931,13 +1946,31 @@ button:active {
   min-height: 0;
   overflow: hidden;
   display: grid;
-  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 8px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
   box-shadow: var(--shadow);
+}
+
+.market-summary-top {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  margin-top: -6px;
+}
+
+.market-summary-top-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .market-news-panel-header {
@@ -1960,19 +1993,20 @@ button:active {
 .market-summary-panel {
   min-width: 0;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   background: transparent;
 }
 
 .market-summary-panel .news-status {
   color: var(--muted);
+  margin-bottom: 0;
 }
 
 .market-summary-card {
   min-width: 0;
   display: grid;
-  gap: 5px;
-  padding: 11px 12px;
+  gap: 3px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
@@ -2029,7 +2063,7 @@ button:active {
   grid-area: news;
   min-height: 0;
   margin-top: 0;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   background: var(--panel-soft);
   box-shadow: none;
@@ -2047,11 +2081,15 @@ button:active {
 }
 
 .news-status {
-  min-height: 0;
+  min-height: 1rem;
   color: var(--muted);
   font-size: 0.74rem;
   font-weight: 700;
   margin-bottom: 5px;
+}
+
+.news-status:empty {
+  visibility: hidden;
 }
 
 .news-status.error {
@@ -2174,7 +2212,7 @@ button:active {
   .primary-content {
     height: auto;
     min-height: 0;
-    grid-template-rows: auto auto;
+    grid-template-rows: auto auto auto;
   }
 
   .chart-panel {
@@ -2234,6 +2272,24 @@ button:active {
 
   .sentiment-panel {
     grid-template-columns: 1fr;
+  }
+
+  .sentiment-panel .signal-gauge,
+  .sentiment-panel .stock-suggestion {
+    border-radius: var(--radius);
+  }
+
+  .analyst-summary {
+    border-radius: var(--radius);
+  }
+
+  .analyst-summary span:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .analyst-summary span:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+    padding-top: 6px;
   }
 
   .sentiment-panel .gauge-labels {
