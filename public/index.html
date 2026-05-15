@@ -54,10 +54,10 @@
     <div class="workspace">
       <div class="primary-content">
         <div class="workspace-tabs" role="tablist" aria-label="Dashboard views">
-          <button id="watchlist-tab" class="workspace-tab active" type="button" role="tab" aria-selected="true" aria-controls="watchlist-panel" data-tab="watchlist">Watchlist</button>
+          <button id="market-news-tab" class="workspace-tab active" type="button" role="tab" aria-selected="true" aria-controls="market-news-panel" data-tab="market-news">Headlines</button>
+          <button id="watchlist-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="watchlist-panel" data-tab="watchlist">Watchlist</button>
           <button id="chart-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="chart-panel" data-tab="chart">Chart</button>
           <button id="options-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="options-panel" data-tab="options">Option Chain</button>
-          <button id="market-news-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="market-news-panel" data-tab="market-news">Headlines</button>
         </div>
 
         <section id="chart-panel" class="chart-panel tab-panel" role="tabpanel" aria-labelledby="chart-tab" hidden>
@@ -119,7 +119,7 @@
           </div>
         </section>
 
-        <aside id="watchlist-panel" class="watchlist-panel tab-panel active" role="tabpanel" aria-labelledby="watchlist-tab">
+        <aside id="watchlist-panel" class="watchlist-panel tab-panel" role="tabpanel" aria-labelledby="watchlist-tab" hidden>
           <div id="watchlist-content" class="watchlist-content">
             <div class="sentiment-panel">
               <div class="sentiment-heading">
@@ -219,15 +219,17 @@
           </div>
         </section>
 
-        <section id="market-news-panel" class="market-news-panel tab-panel" role="tabpanel" aria-labelledby="market-news-tab" hidden>
+        <section id="market-news-panel" class="market-news-panel tab-panel active" role="tabpanel" aria-labelledby="market-news-tab">
           <div class="market-news-panel-header">
             <div>
               <p class="eyebrow">Headlines</p>
               <h2>Market summary</h2>
             </div>
           </div>
-          <div id="market-summary-status" class="news-status">Loading market summary...</div>
-          <div id="market-summary-items" class="market-summary-grid"></div>
+          <section class="market-summary-panel" aria-label="Market summary">
+            <div id="market-summary-status" class="news-status">Loading market summary...</div>
+            <div id="market-summary-items" class="market-summary-grid"></div>
+          </section>
           <div class="market-news-section-header">
             <p class="eyebrow">Market News</p>
             <h2>Latest headlines</h2>
