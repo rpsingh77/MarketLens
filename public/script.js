@@ -12,6 +12,8 @@ const chartQuote = document.getElementById('chart-quote');
 const chartLast = document.getElementById('chart-last');
 const chartChange = document.getElementById('chart-change');
 const chartChangePercent = document.getElementById('chart-change-percent');
+const indicatorMenu = document.getElementById('indicator-menu');
+const indicatorSummary = document.getElementById('indicator-summary');
 const indicatorToggles = document.querySelectorAll('.indicator-toggle');
 const chartFrame = document.getElementById('chart-frame');
 const macdPane = document.getElementById('macd-pane');
@@ -23,6 +25,15 @@ const optionsChainBody = document.getElementById('options-chain-body');
 const newsTitle = document.getElementById('news-title');
 const newsStatus = document.getElementById('news-status');
 const newsItems = document.getElementById('news-items');
+const marketNewsStatus = document.getElementById('market-news-status');
+const marketNewsItems = document.getElementById('market-news-items');
+const marketNewsBrowserFrame = document.getElementById('market-news-browser-frame');
+const marketNewsBrowserEmpty = document.getElementById('market-news-browser-empty');
+const marketNewsUrl = document.getElementById('market-news-url');
+const marketNewsBack = document.getElementById('market-news-back');
+const marketNewsForward = document.getElementById('market-news-forward');
+const marketNewsRefresh = document.getElementById('market-news-refresh');
+const marketNewsOpen = document.getElementById('market-news-open');
 const workspace = document.querySelector('.workspace');
 const watchlistToggle = document.getElementById('watchlist-toggle');
 const watchlistForm = document.getElementById('watchlist-form');
@@ -69,6 +80,13 @@ const WATCHLIST_RECOMMENDATION_LABELS = {
   Neutral: 'Neutral',
   Sell: 'Sell',
   'Strong Sell': 'S Sell'
+};
+const INDICATOR_LABELS = {
+  ema50: 'EMA 50',
+  ema100: 'EMA 100',
+  ema200: 'EMA 200',
+  macd: 'MACD',
+  rsi: 'RSI'
 };
 const DEFAULT_WATCHLIST = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'TSLA'];
 let currentTicker = 'AAPL';
@@ -140,6 +158,26 @@ function getPaneLayout(showMacd, showRsi) {
   return 'none';
 }
 
+function renderIndicatorSummary() {
+  if (!indicatorSummary) return;
+
+  indicatorSummary.textContent = '';
+
+  if (!selectedIndicators.size) {
+    indicatorSummary.textContent = 'Price only';
+    return;
+  }
+
+  Object.entries(INDICATOR_LABELS).forEach(([value, label]) => {
+    if (!selectedIndicators.has(value)) return;
+
+    const item = document.createElement('span');
+    item.className = 'indicator-summary-item';
+    item.innerHTML = `<span class="legend-dot ${value}" aria-hidden="true"></span>${label}`;
+    indicatorSummary.append(item);
+  });
+}
+
 function applyIndicatorSelection(indicators = selectedIndicators) {
   selectedIndicators = indicators instanceof Set ? indicators : new Set(indicators);
 
@@ -162,6 +200,7 @@ function applyIndicatorSelection(indicators = selectedIndicators) {
   if (ema100Series) ema100Series.applyOptions({ visible: showEma100 });
   if (ema200Series) ema200Series.applyOptions({ visible: showEma200 });
 
+  renderIndicatorSummary();
   scheduleChartResize();
 }
 
@@ -542,6 +581,48 @@ function setNewsStatus(message, isError = false) {
   newsStatus.classList.toggle('error', isError);
 }
 
+function setMarketNewsStatus(message, isError = false) {
+  if (!marketNewsStatus) return;
+  marketNewsStatus.textContent = message;
+  marketNewsStatus.classList.toggle('error', isError);
+}
+
+function openMarketNewsArticle(article) {
+  if (!marketNewsBrowserFrame || !marketNewsUrl || !marketNewsOpen) return;
+
+  marketNewsBrowserFrame.src = article.link;
+  marketNewsUrl.value = article.link;
+  marketNewsOpen.href = article.link;
+  marketNewsOpen.hidden = false;
+  if (marketNewsBrowserEmpty) marketNewsBrowserEmpty.hidden = true;
+}
+
+function createNewsCard(article, { browserControl = false } = {}) {
+  const card = document.createElement('article');
+  card.className = 'news-card';
+
+  const meta = document.createElement('div');
+  meta.className = 'news-meta';
+  meta.textContent = [article.publisher, formatNewsTime(article.providerPublishTime)].filter(Boolean).join(' · ');
+
+  const link = document.createElement('a');
+  link.href = article.link;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = article.title;
+
+  if (browserControl) {
+    link.removeAttribute('target');
+    link.addEventListener('click', event => {
+      event.preventDefault();
+      openMarketNewsArticle(article);
+    });
+  }
+
+  card.append(meta, link);
+  return card;
+}
+
 function renderNews(ticker, articles) {
   if (!newsTitle || !newsItems) return;
   newsTitle.textContent = `${ticker} news`;
@@ -553,22 +634,24 @@ function renderNews(ticker, articles) {
   }
 
   articles.forEach(article => {
-    const card = document.createElement('article');
-    card.className = 'news-card';
-
-    const meta = document.createElement('div');
-    meta.className = 'news-meta';
-    meta.textContent = [article.publisher, formatNewsTime(article.providerPublishTime)].filter(Boolean).join(' · ');
-
-    const link = document.createElement('a');
-    link.href = article.link;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.textContent = article.title;
-
-    card.append(meta, link);
-    newsItems.append(card);
+    newsItems.append(createNewsCard(article));
   });
+}
+
+function renderMarketNews(articles) {
+  if (!marketNewsItems) return;
+  marketNewsItems.textContent = '';
+
+  if (!articles.length) {
+    marketNewsItems.innerHTML = '<div class="news-empty">No market news returned.</div>';
+    return;
+  }
+
+  articles.forEach(article => {
+    marketNewsItems.append(createNewsCard(article, { browserControl: true }));
+  });
+
+  openMarketNewsArticle(articles[0]);
 }
 
 async function fetchNews(ticker) {
@@ -587,6 +670,24 @@ async function fetchNews(ticker) {
     if (newsTitle) newsTitle.textContent = `${ticker} news`;
     newsItems.innerHTML = '<div class="news-empty">News unavailable.</div>';
     setNewsStatus(error.message, true);
+  }
+}
+
+async function fetchMarketNews() {
+  if (!marketNewsItems) return;
+  setMarketNewsStatus('Loading market news...');
+  try {
+    const res = await fetch('/api/market-news');
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload.error || 'Failed to fetch market news.');
+    }
+
+    renderMarketNews(payload.news || []);
+    setMarketNewsStatus('');
+  } catch (error) {
+    marketNewsItems.innerHTML = '<div class="news-empty">Market news unavailable.</div>';
+    setMarketNewsStatus(error.message, true);
   }
 }
 
@@ -1125,6 +1226,40 @@ indicatorToggles.forEach(toggle => {
   });
 });
 
+document.addEventListener('click', event => {
+  if (indicatorMenu && indicatorMenu.open && !indicatorMenu.contains(event.target)) {
+    indicatorMenu.open = false;
+  }
+});
+
+if (marketNewsBack) {
+  marketNewsBack.addEventListener('click', () => {
+    try {
+      marketNewsBrowserFrame?.contentWindow?.history.back();
+    } catch (error) {
+      // Cross-origin frames may deny history access.
+    }
+  });
+}
+
+if (marketNewsForward) {
+  marketNewsForward.addEventListener('click', () => {
+    try {
+      marketNewsBrowserFrame?.contentWindow?.history.forward();
+    } catch (error) {
+      // Cross-origin frames may deny history access.
+    }
+  });
+}
+
+if (marketNewsRefresh) {
+  marketNewsRefresh.addEventListener('click', () => {
+    if (marketNewsBrowserFrame?.src) {
+      marketNewsBrowserFrame.src = marketNewsBrowserFrame.src;
+    }
+  });
+}
+
 optionsExpirySelect.addEventListener('change', () => {
   fetchOptionChain(currentTicker, optionsExpirySelect.value);
 });
@@ -1136,8 +1271,10 @@ if (themeSelect) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  applyIndicatorSelection(selectedIndicators);
   applyTheme(getSavedTheme());
   renderWatchlist();
   refreshWatchlistPrices();
+  fetchMarketNews();
   fetchOhlc('AAPL');
 });

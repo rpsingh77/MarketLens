@@ -694,23 +694,49 @@ button:active {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 12px;
   flex-wrap: wrap;
 }
 
 .indicator-control {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  position: relative;
+  width: min(100%, 680px);
   min-width: 0;
   margin: 0;
-  padding: 0;
-  border: 0;
-  flex-wrap: wrap;
 }
 
-.indicator-control > span {
+.indicator-control summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted-strong);
+  cursor: pointer;
+  list-style: none;
+}
+
+.indicator-control summary::-webkit-details-marker {
+  display: none;
+}
+
+.indicator-control summary::after {
+  content: "▾";
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.indicator-control[open] summary {
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.indicator-control summary > span:first-child {
   color: var(--muted-strong);
   font-size: 0.72rem;
   font-weight: 750;
@@ -718,10 +744,46 @@ button:active {
   text-transform: uppercase;
 }
 
-.indicator-control label {
+.indicator-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.indicator-summary-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+}
+
+.indicator-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  display: grid;
+  gap: 6px;
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.indicator-menu label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   min-height: 32px;
   padding: 0 9px;
   border: 1px solid var(--line);
@@ -733,6 +795,10 @@ button:active {
   letter-spacing: 0;
   text-transform: none;
   white-space: nowrap;
+}
+
+.indicator-menu label:hover {
+  background: var(--hover-surface);
 }
 
 .indicator-toggle {
@@ -794,6 +860,14 @@ button:active {
 
 .legend-dot.ema200 {
   background: var(--ema200);
+}
+
+.legend-dot.macd {
+  background: #2563eb;
+}
+
+.legend-dot.rsi {
+  background: #7c3aed;
 }
 
 .sentiment-panel {
@@ -1495,6 +1569,112 @@ button:active {
   background: var(--active-surface);
 }
 
+.market-news-panel {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.market-news-panel-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.market-news-browser-layout {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.48fr) minmax(420px, 1fr);
+  gap: 10px;
+}
+
+.market-news-browser {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.market-news-browser-toolbar {
+  display: grid;
+  grid-template-columns: 32px 32px 32px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-soft);
+}
+
+.browser-control-button {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted-strong);
+  box-shadow: none;
+  font-size: 1rem;
+}
+
+.browser-control-button:hover {
+  transform: none;
+}
+
+#market-news-url {
+  min-height: 32px;
+  text-transform: none;
+}
+
+.browser-open-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+#market-news-browser-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: var(--surface);
+}
+
+#market-news-browser-empty {
+  position: absolute;
+  inset: 49px 0 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  background: var(--surface);
+}
+
+#market-news-browser-empty[hidden] {
+  display: none;
+}
+
 .news-panel {
   grid-area: news;
   min-height: 0;
@@ -1536,6 +1716,22 @@ button:active {
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.market-news-grid {
+  grid-template-columns: 1fr;
+  align-content: start;
+  gap: 8px;
+  padding-right: 0;
+}
+
+.market-news-grid .news-card {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.market-news-grid .news-card + .news-card {
+  border-top: 1px solid var(--line);
 }
 
 .news-card,
@@ -1642,6 +1838,10 @@ button:active {
     height: auto;
   }
 
+  .market-news-panel {
+    height: auto;
+  }
+
   .watchlist-panel {
     position: static;
     height: auto;
@@ -1687,6 +1887,18 @@ button:active {
 
   .news-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-news-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .market-news-browser-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .market-news-browser {
+    min-height: 520px;
   }
 
   .watchlist-items {
@@ -1757,6 +1969,7 @@ button:active {
 
   .chart-panel,
   .options-panel,
+  .market-news-panel,
   .watchlist-panel {
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
   }
@@ -1877,6 +2090,19 @@ button:active {
   .news-grid {
     grid-template-columns: 1fr;
     max-height: none;
+  }
+
+  .market-news-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .market-news-browser-toolbar {
+    grid-template-columns: 32px 32px 32px 1fr;
+  }
+
+  .browser-open-link {
+    grid-column: 1 / -1;
+    justify-content: center;
   }
 }
 

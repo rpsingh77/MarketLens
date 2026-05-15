@@ -371,6 +371,41 @@ app.get('/api/news', async (req, res) => {
   }
 });
 
+app.get('/api/market-news', async (req, res) => {
+  const params = new URLSearchParams({
+    q: 'stock market',
+    quotesCount: '0',
+    newsCount: '20'
+  });
+  const url = `https://query1.finance.yahoo.com/v1/finance/search?${params.toString()}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0'
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Yahoo Finance market news request failed with status ${response.status}` });
+    }
+
+    const payload = await response.json();
+    const news = (payload.news || []).map(item => ({
+      title: item.title,
+      publisher: item.publisher,
+      link: item.link,
+      providerPublishTime: item.providerPublishTime,
+      thumbnail: item.thumbnail?.resolutions?.[0]?.url || null
+    })).filter(item => item.title && item.link);
+
+    return res.json({ topic: 'Market News', news });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Unknown error while fetching market news.' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
 });
