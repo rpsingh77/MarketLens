@@ -430,15 +430,14 @@ app.get('/api/market-news', async (req, res) => {
 });
 
 app.get('/api/market-summary', async (req, res) => {
-  const symbols = ['^GSPC', '^IXIC', '^DJI', '^VIX', '^TNX', 'CL=F', 'GC=F', 'BTC-USD'];
+  const symbols = ['^GSPC', '^IXIC', '^DJI', 'AAPL', '^VIX', '^TNX', 'BTC-USD'];
   const labels = {
     '^GSPC': 'S&P 500',
     '^IXIC': 'Nasdaq',
     '^DJI': 'Dow',
+    AAPL: 'Apple',
     '^VIX': 'VIX',
     '^TNX': '10Y Yield',
-    'CL=F': 'Oil',
-    'GC=F': 'Gold',
     'BTC-USD': 'Bitcoin'
   };
 

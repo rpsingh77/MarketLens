@@ -608,7 +608,7 @@ function setAiStatus(message, isError = false) {
 
 function formatMarketValue(value, symbol) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
-  if (symbol === 'BTC-USD' || symbol === 'CL=F' || symbol === 'GC=F') {
+  if (symbol === 'BTC-USD') {
     return formatCurrency(value);
   }
   if (symbol === '^TNX') {
