@@ -299,6 +299,7 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--page-gradient);
   color: var(--text);
+  overflow-x: clip;
 }
 
 button,
@@ -418,7 +419,7 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 430px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: start;
 }
@@ -434,11 +435,80 @@ h2 {
 .primary-content {
   height: calc(100vh - var(--dashboard-shell-offset));
   min-height: 660px;
-  grid-template-rows: minmax(0, 1fr) 248px;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .workspace.watchlist-collapsed {
-  grid-template-columns: minmax(0, 1fr) 48px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-tabs {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: color-mix(in srgb, var(--panel-soft) 78%, var(--surface));
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.workspace-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace-tab {
+  position: relative;
+  min-height: 42px;
+  padding: 0 20px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.workspace-tab:last-child {
+  border-right: 0;
+}
+
+.workspace-tab::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  bottom: 0;
+  left: 14px;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: transparent;
+}
+
+.workspace-tab:hover {
+  filter: none;
+  transform: none;
+  background: color-mix(in srgb, var(--hover-surface) 70%, transparent);
+  color: var(--muted-strong);
+}
+
+.workspace-tab.active {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.workspace-tab.active::after {
+  background: var(--accent);
+}
+
+.tab-panel[hidden] {
+  display: none !important;
 }
 
 .chart-panel,
@@ -518,6 +588,7 @@ button:active {
 }
 
 .status {
+  grid-area: status;
   min-height: 1rem;
   grid-column: 1 / -1;
   color: var(--muted);
@@ -529,10 +600,14 @@ button:active {
   color: var(--danger);
 }
 
+.watchlist-content .status {
+  grid-column: auto;
+}
+
 .chart-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  height: auto;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   padding: 14px;
@@ -660,6 +735,7 @@ button:active {
 }
 
 .sentiment-panel {
+  grid-area: sentiment;
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
   gap: 8px;
@@ -718,7 +794,6 @@ button:active {
   grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr));
   gap: 6px;
   padding: 7px 8px;
-  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
 }
@@ -805,6 +880,12 @@ button:active {
   min-width: 0;
 }
 
+.watchlist-panel.tab-panel {
+  position: static;
+  height: 100%;
+  min-height: 0;
+}
+
 .watchlist-toggle {
   width: 100%;
   min-height: 36px;
@@ -843,12 +924,24 @@ button:active {
   height: calc(100% - 36px);
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto auto auto auto minmax(330px, 1fr) auto;
-  gap: 6px;
+  grid-template-columns: minmax(440px, 1fr) minmax(300px, 0.72fr);
+  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
+  grid-template-areas:
+    "sentiment news"
+    "header news"
+    "form news"
+    "status news"
+    "table-head news"
+    "items news";
+  gap: 10px;
   padding: 10px;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.watchlist-panel.tab-panel .watchlist-content {
+  height: 100%;
 }
 
 .watchlist-content::-webkit-scrollbar {
@@ -865,6 +958,7 @@ button:active {
 }
 
 .watchlist-header {
+  grid-area: header;
   display: flex;
   align-items: start;
   justify-content: space-between;
@@ -872,6 +966,7 @@ button:active {
 }
 
 .watchlist-form {
+  grid-area: form;
   display: grid;
   gap: 5px;
 }
@@ -908,6 +1003,7 @@ button:active {
 }
 
 .watchlist-table-head {
+  grid-area: table-head;
   display: grid;
   grid-template-columns: var(--watchlist-grid);
   align-items: center;
@@ -925,10 +1021,11 @@ button:active {
 }
 
 .watchlist-items {
+  grid-area: items;
   display: grid;
   align-content: start;
   gap: 0;
-  min-height: 330px;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-color: var(--scrollbar-thumb) transparent;
 }
@@ -1078,7 +1175,7 @@ button:active {
 }
 
 .stock-suggestion {
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   padding: 8px 10px;
   background: var(--surface);
@@ -1089,24 +1186,21 @@ button:active {
 }
 
 .stock-suggestion.positive {
-  border-color: rgba(52, 211, 153, 0.32);
   color: var(--success);
 }
 
 .stock-suggestion.negative {
-  border-color: rgba(251, 113, 133, 0.32);
   color: var(--danger);
 }
 
 .stock-suggestion.neutral {
-  border-color: rgba(56, 189, 248, 0.24);
   color: var(--muted-strong);
 }
 
 .signal-gauge {
   display: grid;
   gap: 6px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--radius);
   padding: 8px 10px;
   background: var(--surface);
@@ -1235,6 +1329,7 @@ button:active {
   background: var(--panel);
   box-shadow: var(--shadow);
   padding: 12px;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   display: grid;
@@ -1328,12 +1423,16 @@ button:active {
 }
 
 .news-panel {
+  grid-area: news;
+  min-height: 0;
   margin-top: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel-soft);
   box-shadow: none;
   padding: 8px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .news-panel-header {
@@ -1360,7 +1459,8 @@ button:active {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0;
-  max-height: 136px;
+  max-height: none;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -1448,17 +1548,25 @@ button:active {
     align-items: start;
   }
 
+  .side-content {
+    order: -1;
+  }
+
   .primary-content {
     height: auto;
     min-height: 0;
-    grid-template-rows: auto;
+    grid-template-rows: auto auto;
   }
 
   .chart-panel {
-    display: block;
+    display: grid;
     height: auto;
     min-height: 0;
     overflow: visible;
+  }
+
+  .options-panel {
+    height: auto;
   }
 
   .watchlist-panel {
@@ -1471,6 +1579,16 @@ button:active {
 
   .watchlist-content {
     height: auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto auto auto auto;
+    grid-template-areas:
+      "sentiment"
+      "header"
+      "form"
+      "status"
+      "table-head"
+      "items"
+      "news";
   }
 
   .sentiment-panel {
@@ -1488,6 +1606,12 @@ button:active {
 
   .options-table-wrap {
     max-height: 340px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .options-table {
+    min-width: 680px;
   }
 
   .news-grid {
@@ -1509,25 +1633,189 @@ button:active {
 @media (max-width: 560px) {
   main {
     width: min(100% - 18px, 1180px);
+    padding-top: 12px;
     padding-bottom: 24px;
+  }
+
+  .site-header {
+    min-height: 0;
+  }
+
+  .site-brand {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .site-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+
+  .site-logo svg {
+    width: 35px;
+    height: 35px;
+  }
+
+  .site-theme-control {
+    width: 100%;
+  }
+
+  .theme-control select {
+    flex: 1;
+  }
+
+  h1 {
+    font-size: 1.2rem;
   }
 
   .chart-panel,
   .watchlist-content {
-    padding: 16px;
+    padding: 12px;
   }
+
+  .workspace-tabs {
+    width: 100%;
+  }
+
+  .workspace-tab {
+    flex: 1;
+    width: auto;
+    min-height: 40px;
+  }
+
+  .chart-panel,
+  .options-panel,
+  .watchlist-panel {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .chart-header {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .chart-quote {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .chart-quote span {
+    display: grid;
+    gap: 2px;
+    white-space: normal;
+  }
+
+  .legend-note {
+    gap: 6px;
+    font-size: 0.72rem;
+  }
+
   .chart-frame {
-    min-height: 520px;
-    height: 68vh;
-    grid-template-rows: minmax(220px, 1fr) 96px 88px;
-    padding: 10px;
+    height: clamp(430px, 70vh, 560px);
+    grid-template-rows: minmax(210px, 1fr) 86px 76px;
+    padding: 8px;
+    gap: 7px;
   }
 
   button {
     width: 100%;
+    min-height: 44px;
+  }
+
+  input[type="text"],
+  select {
+    min-height: 44px;
+  }
+
+  .watchlist-toggle {
+    min-height: 44px;
+  }
+
+  .watchlist-content {
+    --watchlist-grid: minmax(56px, 1fr) 68px 0 58px 50px 24px;
+    --watchlist-gap: 4px;
+  }
+
+  .watchlist-table-head {
+    padding-inline: 4px;
+  }
+
+  .watchlist-table-head span:nth-child(3),
+  .watchlist-change {
+    display: none;
+  }
+
+  .watchlist-item {
+    min-height: 40px;
+    padding: 0 4px;
+  }
+
+  .watchlist-symbol {
+    min-height: 38px;
+    font-size: 0.72rem;
+  }
+
+  .watchlist-price,
+  .watchlist-change-percent,
+  .watchlist-recommendation {
+    font-size: 0.64rem;
+  }
+
+  .watchlist-remove {
+    min-height: 32px;
+    width: 24px;
+  }
+
+  .sentiment-panel {
+    padding: 8px;
+  }
+
+  .analyst-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .options-panel {
+    padding: 10px;
+  }
+
+  .options-panel-header {
+    gap: 8px;
+  }
+
+  .options-table {
+    min-width: 620px;
+    font-size: 0.68rem;
+  }
+
+  .options-table th,
+  .options-table td {
+    padding: 6px;
   }
 
   .news-grid {
     grid-template-columns: 1fr;
+    max-height: none;
+  }
+}
+
+@media (max-width: 380px) {
+  main {
+    width: min(100% - 12px, 1180px);
+  }
+
+  .chart-quote {
+    grid-template-columns: 1fr;
+  }
+
+  .watchlist-content {
+    --watchlist-grid: minmax(52px, 1fr) 64px 0 54px 0 24px;
+    padding: 10px;
+  }
+
+  .watchlist-table-head span:nth-child(5),
+  .watchlist-recommendation {
+    display: none;
   }
 }

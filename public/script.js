@@ -34,6 +34,8 @@ const analystTarget = document.getElementById('analyst-target');
 const analystUpside = document.getElementById('analyst-upside');
 const analystCount = document.getElementById('analyst-count');
 const themeSelect = document.getElementById('theme-select');
+const workspaceTabs = document.querySelectorAll('.workspace-tab');
+const tabPanels = document.querySelectorAll('.tab-panel');
 let chart;
 let candleSeries;
 let ema50Series;
@@ -72,6 +74,41 @@ let watchlistRecommendations = {};
 function showStatus(message, isError = false) {
   statusEl.textContent = message;
   statusEl.classList.toggle('error', isError);
+}
+
+function resizeCharts() {
+  if (!chart) return;
+
+  chart.applyOptions({
+    width: chartContainer.clientWidth,
+    height: chartContainer.clientHeight
+  });
+  macdChart.applyOptions({
+    width: macdContainer.clientWidth,
+    height: macdContainer.clientHeight
+  });
+  rsiChart.applyOptions({
+    width: rsiContainer.clientWidth,
+    height: rsiContainer.clientHeight
+  });
+}
+
+function activateWorkspaceTab(tabName) {
+  workspaceTabs.forEach(tab => {
+    const isActive = tab.dataset.tab === tabName;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', String(isActive));
+  });
+
+  tabPanels.forEach(panel => {
+    const isActive = panel.id === `${tabName}-panel`;
+    panel.classList.toggle('active', isActive);
+    panel.hidden = !isActive;
+  });
+
+  if (tabName === 'chart') {
+    requestAnimationFrame(resizeCharts);
+  }
 }
 
 function normalizeTicker(value) {
@@ -975,10 +1012,18 @@ watchlistForm.addEventListener('submit', event => {
   watchlistInput.value = '';
 });
 
-watchlistToggle.addEventListener('click', () => {
-  const isCollapsed = workspace.classList.toggle('watchlist-collapsed');
-  watchlistToggle.setAttribute('aria-expanded', String(!isCollapsed));
-  watchlistToggle.setAttribute('aria-label', isCollapsed ? 'Expand watchlist' : 'Collapse watchlist');
+if (watchlistToggle) {
+  watchlistToggle.addEventListener('click', () => {
+    const isCollapsed = workspace.classList.toggle('watchlist-collapsed');
+    watchlistToggle.setAttribute('aria-expanded', String(!isCollapsed));
+    watchlistToggle.setAttribute('aria-label', isCollapsed ? 'Expand watchlist' : 'Collapse watchlist');
+  });
+}
+
+workspaceTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    activateWorkspaceTab(tab.dataset.tab);
+  });
 });
 
 optionsExpirySelect.addEventListener('change', () => {

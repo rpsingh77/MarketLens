@@ -53,7 +53,13 @@
 
     <div class="workspace">
       <div class="primary-content">
-        <section class="chart-panel" aria-label="Price chart">
+        <div class="workspace-tabs" role="tablist" aria-label="Dashboard views">
+          <button id="watchlist-tab" class="workspace-tab active" type="button" role="tab" aria-selected="true" aria-controls="watchlist-panel" data-tab="watchlist">Watchlist</button>
+          <button id="chart-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="chart-panel" data-tab="chart">Chart</button>
+          <button id="options-tab" class="workspace-tab" type="button" role="tab" aria-selected="false" aria-controls="options-panel" data-tab="options">Option Chain</button>
+        </div>
+
+        <section id="chart-panel" class="chart-panel tab-panel" role="tabpanel" aria-labelledby="chart-tab" hidden>
           <div class="chart-header">
             <div>
               <h2 id="chart-heading">AAPL</h2>
@@ -84,52 +90,7 @@
           </div>
         </section>
 
-        <section class="options-panel" aria-label="Option chain">
-          <div class="options-panel-header">
-            <div>
-              <p class="eyebrow">Option Chain</p>
-              <h2 id="options-title">AAPL</h2>
-            </div>
-            <label for="options-expiry-select">Expiry</label>
-            <select id="options-expiry-select"></select>
-          </div>
-          <div id="options-status" class="options-status">Option chain loads after a ticker is selected.</div>
-          <div class="options-table-wrap">
-            <table class="options-table">
-              <thead>
-                <tr>
-                  <th colspan="4">Calls</th>
-                  <th>Strike</th>
-                  <th colspan="4">Puts</th>
-                </tr>
-                <tr>
-                  <th>Last</th>
-                  <th>Bid</th>
-                  <th>Ask</th>
-                  <th>Vol</th>
-                  <th>Strike</th>
-                  <th>Last</th>
-                  <th>Bid</th>
-                  <th>Ask</th>
-                  <th>Vol</th>
-                </tr>
-              </thead>
-              <tbody id="options-chain-body">
-                <tr>
-                  <td colspan="9">No option chain loaded.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </div>
-
-      <div class="side-content">
-        <aside id="watchlist-panel" class="watchlist-panel" aria-label="Watchlist">
-          <button id="watchlist-toggle" class="watchlist-toggle" type="button" aria-expanded="true" aria-controls="watchlist-content" aria-label="Collapse watchlist">
-            <span class="toggle-arrow" aria-hidden="true">›</span>
-            <span class="collapse-closed" aria-hidden="true">Watchlist</span>
-          </button>
+        <aside id="watchlist-panel" class="watchlist-panel tab-panel active" role="tabpanel" aria-labelledby="watchlist-tab">
           <div id="watchlist-content" class="watchlist-content">
             <div class="sentiment-panel">
               <div class="sentiment-heading">
@@ -196,6 +157,45 @@
             </section>
           </div>
         </aside>
+
+        <section id="options-panel" class="options-panel tab-panel" role="tabpanel" aria-labelledby="options-tab" hidden>
+          <div class="options-panel-header">
+            <div>
+              <p class="eyebrow">Option Chain</p>
+              <h2 id="options-title">AAPL</h2>
+            </div>
+            <label for="options-expiry-select">Expiry</label>
+            <select id="options-expiry-select"></select>
+          </div>
+          <div id="options-status" class="options-status">Option chain loads after a ticker is selected.</div>
+          <div class="options-table-wrap">
+            <table class="options-table">
+              <thead>
+                <tr>
+                  <th colspan="4">Calls</th>
+                  <th>Strike</th>
+                  <th colspan="4">Puts</th>
+                </tr>
+                <tr>
+                  <th>Last</th>
+                  <th>Bid</th>
+                  <th>Ask</th>
+                  <th>Vol</th>
+                  <th>Strike</th>
+                  <th>Last</th>
+                  <th>Bid</th>
+                  <th>Ask</th>
+                  <th>Vol</th>
+                </tr>
+              </thead>
+              <tbody id="options-chain-body">
+                <tr>
+                  <td colspan="9">No option chain loaded.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </div>
   </main>
