@@ -1,0 +1,999 @@
+const statusEl = document.getElementById('status');
+const chartContainer = document.getElementById('ohlc-chart');
+const macdContainer = document.getElementById('macd-chart');
+const rsiContainer = document.getElementById('rsi-chart');
+const summarySymbol = document.getElementById('summary-symbol');
+const summaryClose = document.getElementById('summary-close');
+const summaryChange = document.getElementById('summary-change');
+const summaryRange = document.getElementById('summary-range');
+const chartHeading = document.getElementById('chart-heading');
+const sentimentTickerHeading = document.getElementById('sentiment-ticker-heading');
+const chartQuote = document.getElementById('chart-quote');
+const chartLast = document.getElementById('chart-last');
+const chartChange = document.getElementById('chart-change');
+const chartChangePercent = document.getElementById('chart-change-percent');
+const optionsTitle = document.getElementById('options-title');
+const optionsExpirySelect = document.getElementById('options-expiry-select');
+const optionsStatus = document.getElementById('options-status');
+const optionsChainBody = document.getElementById('options-chain-body');
+const newsTitle = document.getElementById('news-title');
+const newsStatus = document.getElementById('news-status');
+const newsItems = document.getElementById('news-items');
+const workspace = document.querySelector('.workspace');
+const watchlistToggle = document.getElementById('watchlist-toggle');
+const watchlistForm = document.getElementById('watchlist-form');
+const watchlistInput = document.getElementById('watchlist-input');
+const watchlistItems = document.getElementById('watchlist-items');
+const stockSuggestion = document.getElementById('stock-suggestion');
+const signalGauge = document.getElementById('signal-gauge');
+const gaugePointer = document.getElementById('gauge-pointer');
+const gaugePercent = document.getElementById('gauge-percent');
+const gaugeRating = document.getElementById('gauge-rating');
+const analystRecommendation = document.getElementById('analyst-recommendation');
+const analystTarget = document.getElementById('analyst-target');
+const analystUpside = document.getElementById('analyst-upside');
+const analystCount = document.getElementById('analyst-count');
+const themeSelect = document.getElementById('theme-select');
+let chart;
+let candleSeries;
+let ema50Series;
+let ema100Series;
+let ema200Series;
+let macdChart;
+let macdLineSeries;
+let macdSignalSeries;
+let macdHistogramSeries;
+let rsiChart;
+let rsiSeries;
+let rsiUpperSeries;
+let rsiLowerSeries;
+let chartResizeObserver;
+const DISPLAY_CALENDAR_DAYS = 365;
+const WATCHLIST_PRICE_BATCH_SIZE = 5;
+const OPTION_STRIKES_EACH_SIDE = 25;
+const WATCHLIST_KEY = 'marketLensWatchlist';
+const THEME_KEY = 'marketLensTheme';
+const THEMES = new Set(['light', 'slate', 'mint', 'midnight', 'graphite', 'alpine', 'rose', 'contrast']);
+const WATCHLIST_RECOMMENDATION_LABELS = {
+  'Strong Buy': 'S Buy',
+  Buy: 'Buy',
+  Neutral: 'Neutral',
+  Sell: 'Sell',
+  'Strong Sell': 'S Sell'
+};
+const DEFAULT_WATCHLIST = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'TSLA'];
+let currentTicker = 'AAPL';
+let watchlist = loadWatchlist();
+let watchlistPrices = {};
+let watchlistDirections = {};
+let watchlistChanges = {};
+let watchlistRecommendations = {};
+
+function showStatus(message, isError = false) {
+  statusEl.textContent = message;
+  statusEl.classList.toggle('error', isError);
+}
+
+function normalizeTicker(value) {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9.-]/g, '');
+}
+
+function loadWatchlist() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(WATCHLIST_KEY));
+    if (Array.isArray(saved) && saved.length) {
+      return saved.map(normalizeTicker).filter(Boolean);
+    }
+  } catch (error) {
+    localStorage.removeItem(WATCHLIST_KEY);
+  }
+  return DEFAULT_WATCHLIST;
+}
+
+function saveWatchlist() {
+  localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist));
+}
+
+function getSavedTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    return THEMES.has(saved) ? saved : 'light';
+  } catch (error) {
+    return 'light';
+  }
+}
+
+function getCssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function getChartThemeOptions() {
+  return {
+    layout: {
+      background: { color: getCssVar('--chart-bg') || '#ffffff' },
+      textColor: getCssVar('--chart-text') || '#475569',
+      fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+    },
+    grid: {
+      vertLines: { color: getCssVar('--chart-grid') || 'rgba(15, 23, 42, 0.08)' },
+      horzLines: { color: getCssVar('--chart-grid') || 'rgba(15, 23, 42, 0.08)' }
+    },
+    rightPriceScale: {
+      borderColor: getCssVar('--chart-border') || 'rgba(15, 23, 42, 0.12)'
+    },
+    timeScale: {
+      borderColor: getCssVar('--chart-border') || 'rgba(15, 23, 42, 0.12)',
+      timeVisible: true,
+      secondsVisible: false
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal
+    }
+  };
+}
+
+function applyChartTheme() {
+  if (!chart) return;
+
+  const options = getChartThemeOptions();
+  [chart, macdChart, rsiChart].filter(Boolean).forEach(chartInstance => {
+    chartInstance.applyOptions(options);
+  });
+
+  const success = getCssVar('--success') || '#16a34a';
+  const danger = getCssVar('--danger') || '#dc2626';
+  candleSeries.applyOptions({
+    upColor: success,
+    downColor: danger,
+    borderUpColor: success,
+    borderDownColor: danger,
+    wickUpColor: success,
+    wickDownColor: danger
+  });
+  ema50Series.applyOptions({ color: getCssVar('--ema50') || '#38bdf8' });
+  ema100Series.applyOptions({ color: getCssVar('--ema100') || '#f43f5e' });
+  ema200Series.applyOptions({ color: getCssVar('--ema200') || '#8b5cf6' });
+}
+
+function applyTheme(theme) {
+  const normalizedTheme = THEMES.has(theme) ? theme : 'light';
+  document.documentElement.dataset.theme = normalizedTheme;
+  if (themeSelect) themeSelect.value = normalizedTheme;
+
+  try {
+    localStorage.setItem(THEME_KEY, normalizedTheme);
+  } catch (error) {
+    // A private browsing mode may block localStorage; the theme still applies for this session.
+  }
+
+  requestAnimationFrame(applyChartTheme);
+}
+
+function renderWatchlist() {
+  watchlistItems.textContent = '';
+
+  watchlist.forEach(symbol => {
+    const price = watchlistPrices[symbol];
+    const direction = watchlistDirections[symbol];
+    const change = watchlistChanges[symbol];
+    const recommendation = watchlistRecommendations[symbol];
+    const item = document.createElement('div');
+    item.className = 'watchlist-item';
+    item.classList.toggle('active', symbol === currentTicker);
+
+    const loadButton = document.createElement('button');
+    loadButton.className = 'watchlist-symbol';
+    loadButton.type = 'button';
+    const changeValueText = change ? `${change.value >= 0 ? '+' : ''}${formatCurrency(change.value)}` : '--';
+    const changePercentText = change ? `${change.percent >= 0 ? '+' : ''}${change.percent.toFixed(2)}%` : '--';
+    const recommendationText = WATCHLIST_RECOMMENDATION_LABELS[recommendation?.label] || recommendation?.label || '--';
+    const recommendationClass = recommendation?.recommendationClass || 'neutral';
+    loadButton.innerHTML = `
+      <span class="watchlist-ticker">${symbol}</span>
+      <span class="watchlist-price">${price ? formatCurrency(price) : '--'}</span>
+      <span class="watchlist-change">${changeValueText}</span>
+      <span class="watchlist-change-percent">${changePercentText}</span>
+      <span class="watchlist-recommendation ${recommendationClass}">${recommendationText}</span>
+    `;
+    loadButton.classList.toggle('positive', direction === 'up');
+    loadButton.classList.toggle('negative', direction === 'down');
+    loadButton.addEventListener('click', () => {
+      fetchOhlc(symbol);
+    });
+
+    const removeButton = document.createElement('button');
+    removeButton.className = 'watchlist-remove';
+    removeButton.type = 'button';
+    removeButton.setAttribute('aria-label', `Remove ${symbol} from watchlist`);
+    removeButton.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M3 6h18" />
+        <path d="M8 6V4h8v2" />
+        <path d="M6 6l1 14h10l1-14" />
+        <path d="M10 11v5" />
+        <path d="M14 11v5" />
+      </svg>
+    `;
+    removeButton.addEventListener('click', () => {
+      watchlist = watchlist.filter(itemSymbol => itemSymbol !== symbol);
+      delete watchlistRecommendations[symbol];
+      saveWatchlist();
+      renderWatchlist();
+    });
+
+    item.append(loadButton, removeButton);
+    watchlistItems.append(item);
+  });
+}
+
+async function refreshWatchlistPrices() {
+  for (let i = 0; i < watchlist.length; i += WATCHLIST_PRICE_BATCH_SIZE) {
+    const batch = watchlist.slice(i, i + WATCHLIST_PRICE_BATCH_SIZE);
+    await Promise.all(batch.map(async symbol => {
+      try {
+        const params = new URLSearchParams({ ticker: symbol, range: '2y' });
+        const res = await fetch(`/api/ohlc?${params.toString()}`);
+        const payload = await res.json();
+        if (!res.ok || !payload.data.length) return;
+        const last = payload.data[payload.data.length - 1];
+        const previous = payload.data[payload.data.length - 2];
+        watchlistPrices[symbol] = last.close;
+        if (previous) {
+          const change = last.close - previous.close;
+          watchlistDirections[symbol] = change >= 0 ? 'up' : 'down';
+          watchlistChanges[symbol] = {
+            value: change,
+            percent: (change / previous.close) * 100
+          };
+        }
+        watchlistRecommendations[symbol] = createTechnicalSignalFromData(payload.data);
+      } catch (error) {
+        watchlistPrices[symbol] = null;
+        watchlistDirections[symbol] = null;
+        watchlistChanges[symbol] = null;
+        watchlistRecommendations[symbol] = null;
+      }
+    }));
+    renderWatchlist();
+  }
+}
+
+function addToWatchlist(symbol) {
+  const normalized = normalizeTicker(symbol);
+  if (!normalized) {
+    showStatus('Please enter a ticker symbol.', true);
+    return;
+  }
+  if (!watchlist.includes(normalized)) {
+    watchlist = [normalized, ...watchlist];
+    saveWatchlist();
+  }
+  renderWatchlist();
+  fetchOhlc(normalized);
+}
+
+function calculateEMA(data, period) {
+  if (data.length < period) return Array(data.length).fill(null);
+
+  const ema = [];
+  const multiplier = 2 / (period + 1);
+
+  // Calculate SMA for the first period
+  let sum = 0;
+  for (let i = 0; i < period; i++) {
+    sum += data[i];
+    ema.push(null);
+  }
+  let currentEMA = sum / period;
+  ema[period - 1] = currentEMA;
+
+  // Calculate EMA for remaining values
+  for (let i = period; i < data.length; i++) {
+    currentEMA = (data[i] - currentEMA) * multiplier + currentEMA;
+    ema.push(currentEMA);
+  }
+
+  return ema;
+}
+
+function calculateRSI(data, period = 14) {
+  if (data.length <= period) return Array(data.length).fill(null);
+
+  const rsi = Array(data.length).fill(null);
+  let gainSum = 0;
+  let lossSum = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const change = data[i] - data[i - 1];
+    if (change >= 0) gainSum += change;
+    else lossSum += Math.abs(change);
+  }
+
+  let averageGain = gainSum / period;
+  let averageLoss = lossSum / period;
+  rsi[period] = averageLoss === 0 ? 100 : 100 - (100 / (1 + averageGain / averageLoss));
+
+  for (let i = period + 1; i < data.length; i++) {
+    const change = data[i] - data[i - 1];
+    const gain = Math.max(change, 0);
+    const loss = Math.max(-change, 0);
+    averageGain = ((averageGain * (period - 1)) + gain) / period;
+    averageLoss = ((averageLoss * (period - 1)) + loss) / period;
+    rsi[i] = averageLoss === 0 ? 100 : 100 - (100 / (1 + averageGain / averageLoss));
+  }
+
+  return rsi;
+}
+
+function calculateMACD(data, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+  const fastEma = calculateEMA(data, fastPeriod);
+  const slowEma = calculateEMA(data, slowPeriod);
+  const macd = data.map((_, index) => {
+    if (fastEma[index] == null || slowEma[index] == null) return null;
+    return fastEma[index] - slowEma[index];
+  });
+  const signal = calculateEMA(macd.filter(value => value != null), signalPeriod);
+  const paddedSignal = Array(macd.length).fill(null);
+  let signalIndex = 0;
+
+  macd.forEach((value, index) => {
+    if (value == null) return;
+    paddedSignal[index] = signal[signalIndex];
+    signalIndex += 1;
+  });
+
+  const histogram = macd.map((value, index) => {
+    if (value == null || paddedSignal[index] == null) return null;
+    return value - paddedSignal[index];
+  });
+
+  return { macd, signal: paddedSignal, histogram };
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 2
+  }).format(value);
+}
+
+function formatDate(value) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+function formatExpiration(timestamp) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(new Date(timestamp * 1000));
+}
+
+function formatNewsTime(timestamp) {
+  if (!timestamp) return '';
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  }).format(new Date(timestamp * 1000));
+}
+
+function formatOptionValue(value, formatter = valueToFormat => valueToFormat) {
+  if (typeof value !== 'number') return '--';
+  return formatter(value);
+}
+
+function formatSignedPercent(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
+  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+}
+
+function setAnalystSummaryState({ recommendation = '--', target = '--', upside = '--', count = '--', upsideValue = null } = {}) {
+  if (!analystRecommendation || !analystTarget || !analystUpside || !analystCount) return;
+
+  analystRecommendation.textContent = recommendation;
+  analystTarget.textContent = target;
+  analystUpside.textContent = upside;
+  analystCount.textContent = count;
+  analystUpside.classList.toggle('positive', typeof upsideValue === 'number' && upsideValue >= 0);
+  analystUpside.classList.toggle('negative', typeof upsideValue === 'number' && upsideValue < 0);
+}
+
+async function fetchAnalystSummary(ticker) {
+  setAnalystSummaryState({ recommendation: 'Loading...', target: '--', upside: '--' });
+
+  try {
+    const res = await fetch(`/api/analyst?ticker=${encodeURIComponent(ticker)}`);
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload.error || 'Failed to fetch analyst summary.');
+    }
+
+    setAnalystSummaryState({
+      recommendation: payload.recommendation || '--',
+      target: typeof payload.targetMeanPrice === 'number' ? formatCurrency(payload.targetMeanPrice) : '--',
+      upside: formatSignedPercent(payload.upsidePercent),
+      count: typeof payload.analystCount === 'number' ? String(payload.analystCount) : '--',
+      upsideValue: payload.upsidePercent
+    });
+  } catch (error) {
+    setAnalystSummaryState({ recommendation: 'Unavailable', target: '--', upside: '--' });
+  }
+}
+
+function setNewsStatus(message, isError = false) {
+  if (!newsStatus) return;
+  newsStatus.textContent = message;
+  newsStatus.classList.toggle('error', isError);
+}
+
+function renderNews(ticker, articles) {
+  if (!newsTitle || !newsItems) return;
+  newsTitle.textContent = `${ticker} news`;
+  newsItems.textContent = '';
+
+  if (!articles.length) {
+    newsItems.innerHTML = '<div class="news-empty">No recent news returned for this ticker.</div>';
+    return;
+  }
+
+  articles.forEach(article => {
+    const card = document.createElement('article');
+    card.className = 'news-card';
+
+    const meta = document.createElement('div');
+    meta.className = 'news-meta';
+    meta.textContent = [article.publisher, formatNewsTime(article.providerPublishTime)].filter(Boolean).join(' · ');
+
+    const link = document.createElement('a');
+    link.href = article.link;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = article.title;
+
+    card.append(meta, link);
+    newsItems.append(card);
+  });
+}
+
+async function fetchNews(ticker) {
+  if (!newsItems) return;
+  setNewsStatus('Loading news...');
+  try {
+    const res = await fetch(`/api/news?ticker=${encodeURIComponent(ticker)}`);
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload.error || 'Failed to fetch news.');
+    }
+
+    renderNews(payload.ticker, payload.news || []);
+    setNewsStatus('');
+  } catch (error) {
+    if (newsTitle) newsTitle.textContent = `${ticker} news`;
+    newsItems.innerHTML = '<div class="news-empty">News unavailable.</div>';
+    setNewsStatus(error.message, true);
+  }
+}
+
+function setOptionsStatus(message, isError = false) {
+  optionsStatus.textContent = message;
+  optionsStatus.classList.toggle('error', isError);
+}
+
+function renderOptionsChain(payload) {
+  const callsByStrike = new Map(payload.calls.map(contract => [String(contract.strike), contract]));
+  const putsByStrike = new Map(payload.puts.map(contract => [String(contract.strike), contract]));
+  const strikes = [...new Set([...callsByStrike.keys(), ...putsByStrike.keys()])]
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  optionsTitle.textContent = payload.ticker;
+  optionsChainBody.textContent = '';
+
+  if (!strikes.length) {
+    optionsChainBody.innerHTML = '<tr><td colspan="9">No contracts returned for this expiry.</td></tr>';
+    return;
+  }
+
+  const nearestStrikeIndex = typeof payload.underlyingPrice === 'number'
+    ? strikes.reduce((closestIndex, strike, index) => {
+      const closestStrike = strikes[closestIndex];
+      return Math.abs(strike - payload.underlyingPrice) < Math.abs(closestStrike - payload.underlyingPrice)
+        ? index
+        : closestIndex;
+    }, 0)
+    : 0;
+  const nearestStrike = strikes[nearestStrikeIndex];
+  const startIndex = Math.max(0, nearestStrikeIndex - OPTION_STRIKES_EACH_SIDE);
+  const endIndex = Math.min(strikes.length, nearestStrikeIndex + OPTION_STRIKES_EACH_SIDE + 1);
+  const visibleStrikes = strikes.slice(startIndex, endIndex);
+
+  if (!visibleStrikes.length) {
+    optionsChainBody.innerHTML = '<tr><td colspan="9">No strikes found within the selected range.</td></tr>';
+    return;
+  }
+
+  visibleStrikes.forEach(strike => {
+    const call = callsByStrike.get(String(strike));
+    const put = putsByStrike.get(String(strike));
+    const row = document.createElement('tr');
+    row.classList.toggle('near-money', strike === nearestStrike);
+    row.innerHTML = `
+      <td>${formatOptionValue(call?.lastPrice, formatCurrency)}</td>
+      <td>${formatOptionValue(call?.bid, formatCurrency)}</td>
+      <td>${formatOptionValue(call?.ask, formatCurrency)}</td>
+      <td>${formatOptionValue(call?.volume)}</td>
+      <td class="strike-cell">${formatCurrency(strike)}</td>
+      <td>${formatOptionValue(put?.lastPrice, formatCurrency)}</td>
+      <td>${formatOptionValue(put?.bid, formatCurrency)}</td>
+      <td>${formatOptionValue(put?.ask, formatCurrency)}</td>
+      <td>${formatOptionValue(put?.volume)}</td>
+    `;
+    optionsChainBody.append(row);
+  });
+}
+
+async function fetchOptionChain(ticker, expiration) {
+  if (!optionsExpirySelect || !optionsChainBody) return;
+  setOptionsStatus('Loading option chain...');
+  try {
+    const params = new URLSearchParams({ ticker });
+    if (expiration) params.set('expiration', expiration);
+    const res = await fetch(`/api/options?${params.toString()}`);
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload.error || 'Failed to fetch option chain.');
+    }
+
+    const selected = String(payload.expiration);
+    optionsExpirySelect.textContent = '';
+    payload.expirations.forEach(expirationTimestamp => {
+      const option = document.createElement('option');
+      option.value = String(expirationTimestamp);
+      option.textContent = formatExpiration(expirationTimestamp);
+      option.selected = String(expirationTimestamp) === selected;
+      optionsExpirySelect.append(option);
+    });
+    renderOptionsChain(payload);
+    setOptionsStatus('');
+  } catch (error) {
+    optionsTitle.textContent = ticker;
+    optionsChainBody.innerHTML = '<tr><td colspan="9">Option chain unavailable.</td></tr>';
+    setOptionsStatus(error.message, true);
+  }
+}
+
+function updateSummary(formatted, ticker) {
+  const last = formatted[formatted.length - 1];
+  const previous = formatted[formatted.length - 2];
+  chartHeading.textContent = ticker;
+  if (sentimentTickerHeading) sentimentTickerHeading.textContent = ticker;
+
+  if (chartLast && chartChange && chartChangePercent) {
+    chartLast.textContent = formatCurrency(last.c);
+    chartQuote.classList.remove('positive', 'negative', 'neutral');
+
+    if (previous) {
+      const sessionChange = last.c - previous.c;
+      const sessionChangePercent = (sessionChange / previous.c) * 100;
+      chartChange.textContent = `${sessionChange >= 0 ? '+' : ''}${formatCurrency(sessionChange)}`;
+      chartChangePercent.textContent = `${sessionChangePercent >= 0 ? '+' : ''}${sessionChangePercent.toFixed(2)}%`;
+      chartQuote.classList.add(sessionChange >= 0 ? 'positive' : 'negative');
+    } else {
+      chartChange.textContent = '--';
+      chartChangePercent.textContent = '--';
+      chartQuote.classList.add('neutral');
+    }
+  }
+
+  if (!summarySymbol || !summaryClose || !summaryChange || !summaryRange) {
+    return;
+  }
+
+  const first = formatted[0];
+  const change = last.c - first.c;
+  const changePercent = (change / first.c) * 100;
+  const changeText = `${change >= 0 ? '+' : ''}${formatCurrency(change)} (${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%)`;
+
+  summarySymbol.textContent = ticker;
+  summaryClose.textContent = formatCurrency(last.c);
+  summaryChange.textContent = changeText;
+  summaryChange.classList.toggle('positive', change >= 0);
+  summaryChange.classList.toggle('negative', change < 0);
+  summaryRange.textContent = `${formatDate(first.x)} - ${formatDate(last.x)}`;
+}
+
+function getLatestValue(values) {
+  return values.findLast(value => value != null);
+}
+
+function getTechnicalRating(scoreRatio) {
+  if (scoreRatio >= 0.65) return { label: 'Strong Buy', className: 'strong-buy' };
+  if (scoreRatio >= 0.25) return { label: 'Buy', className: 'buy' };
+  if (scoreRatio <= -0.65) return { label: 'Strong Sell', className: 'strong-sell' };
+  if (scoreRatio <= -0.25) return { label: 'Sell', className: 'sell' };
+  return { label: 'Neutral', className: 'neutral' };
+}
+
+function getRecommendationClass(className) {
+  if (className === 'strong-buy' || className === 'buy') return 'positive';
+  if (className === 'strong-sell' || className === 'sell') return 'negative';
+  return 'neutral';
+}
+
+function analyzeTechnicalSignal(formatted, ema50, ema100, ema200, macd, macdSignal, macdHistogram, rsi) {
+  const last = formatted[formatted.length - 1];
+  const latestEma50 = getLatestValue(ema50);
+  const latestEma100 = getLatestValue(ema100);
+  const latestEma200 = getLatestValue(ema200);
+  const latestMacd = getLatestValue(macd);
+  const latestMacdSignal = getLatestValue(macdSignal);
+  const latestMacdHistogram = getLatestValue(macdHistogram);
+  const latestRsi = getLatestValue(rsi);
+  const parts = [];
+  let score = 0;
+  let maxScore = 0;
+
+  if (latestEma50 != null && latestEma100 != null && latestEma200 != null) {
+    maxScore += 3;
+    score += last.c > latestEma50 ? 1 : -1;
+    score += latestEma50 > latestEma100 ? 1 : -1;
+    score += latestEma100 > latestEma200 ? 1 : -1;
+
+    if (last.c > latestEma50 && latestEma50 > latestEma100 && latestEma100 > latestEma200) {
+      parts.push('EMA trend is bullish.');
+    } else if (last.c < latestEma50 && latestEma50 < latestEma100 && latestEma100 < latestEma200) {
+      parts.push('EMA trend is bearish.');
+    } else {
+      parts.push('EMA trend is mixed.');
+    }
+  } else {
+    parts.push('EMA history is still building.');
+  }
+
+  if (latestMacd != null && latestMacdSignal != null && latestMacdHistogram != null) {
+    maxScore += 1;
+    if (latestMacd > latestMacdSignal && latestMacdHistogram > 0) {
+      score += 1;
+      parts.push('MACD is bullish.');
+    } else if (latestMacd < latestMacdSignal && latestMacdHistogram < 0) {
+      score -= 1;
+      parts.push('MACD is bearish.');
+    } else {
+      parts.push('MACD is mixed.');
+    }
+  } else {
+    parts.push('MACD is unavailable.');
+  }
+
+  if (latestRsi != null) {
+    maxScore += 1;
+    if (latestRsi >= 55 && latestRsi <= 70) {
+      score += 1;
+      parts.push(`RSI ${latestRsi.toFixed(1)} supports momentum.`);
+    } else if (latestRsi <= 45 && latestRsi >= 30) {
+      score -= 1;
+      parts.push(`RSI ${latestRsi.toFixed(1)} is weak.`);
+    } else if (latestRsi > 70) {
+      parts.push(`RSI ${latestRsi.toFixed(1)} is overbought.`);
+    } else if (latestRsi < 30) {
+      parts.push(`RSI ${latestRsi.toFixed(1)} is oversold.`);
+    } else {
+      parts.push(`RSI ${latestRsi.toFixed(1)} is neutral.`);
+    }
+  } else {
+    parts.push('RSI is unavailable.');
+  }
+
+  const scoreRatio = maxScore ? score / maxScore : 0;
+  const percent = maxScore ? Math.round(((score + maxScore) / (maxScore * 2)) * 100) : 50;
+  const rating = getTechnicalRating(scoreRatio);
+
+  return {
+    ...rating,
+    percent: Math.max(0, Math.min(100, percent)),
+    angle: ((Math.max(0, Math.min(100, percent)) / 100) * 180) - 90,
+    message: `Technical recommendation: ${rating.label}. ${parts.join(' ')}`,
+    recommendationClass: getRecommendationClass(rating.className)
+  };
+}
+
+function updateSuggestion(technicalSignal) {
+  stockSuggestion.classList.remove('positive', 'negative', 'neutral');
+  stockSuggestion.textContent = technicalSignal.message;
+  stockSuggestion.classList.add(technicalSignal.recommendationClass);
+}
+
+function updateGauge(technicalSignal) {
+  signalGauge.className = `signal-gauge ${technicalSignal.className}`;
+  signalGauge.setAttribute('aria-label', `Technical rating: ${technicalSignal.label}, ${technicalSignal.percent}%`);
+  gaugePointer.style.transform = `translateX(-50%) rotate(${technicalSignal.angle}deg)`;
+  gaugePercent.textContent = `${technicalSignal.percent}%`;
+  gaugeRating.textContent = technicalSignal.label;
+}
+
+function ensureChart() {
+  if (chart) return;
+
+  const baseOptions = getChartThemeOptions();
+  const success = getCssVar('--success') || '#16a34a';
+  const danger = getCssVar('--danger') || '#dc2626';
+
+  chart = LightweightCharts.createChart(chartContainer, {
+    ...baseOptions,
+    width: chartContainer.clientWidth,
+    height: chartContainer.clientHeight
+  });
+
+  candleSeries = chart.addCandlestickSeries({
+    upColor: success,
+    downColor: danger,
+    borderUpColor: success,
+    borderDownColor: danger,
+    wickUpColor: success,
+    wickDownColor: danger,
+    priceFormat: {
+      type: 'price',
+      precision: 2,
+      minMove: 0.01
+    }
+  });
+
+  ema50Series = chart.addLineSeries({
+    color: getCssVar('--ema50') || '#38bdf8',
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
+
+  ema100Series = chart.addLineSeries({
+    color: getCssVar('--ema100') || '#f43f5e',
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
+
+  ema200Series = chart.addLineSeries({
+    color: getCssVar('--ema200') || '#8b5cf6',
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
+
+  macdChart = LightweightCharts.createChart(macdContainer, {
+    ...baseOptions,
+    width: macdContainer.clientWidth,
+    height: macdContainer.clientHeight
+  });
+  macdHistogramSeries = macdChart.addHistogramSeries({
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
+  macdLineSeries = macdChart.addLineSeries({
+    color: '#2563eb',
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
+  macdSignalSeries = macdChart.addLineSeries({
+    color: '#f97316',
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
+
+  rsiChart = LightweightCharts.createChart(rsiContainer, {
+    ...baseOptions,
+    width: rsiContainer.clientWidth,
+    height: rsiContainer.clientHeight
+  });
+  rsiSeries = rsiChart.addLineSeries({
+    color: '#7c3aed',
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
+  rsiUpperSeries = rsiChart.addLineSeries({
+    color: 'rgba(220, 38, 38, 0.55)',
+    lineWidth: 1,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
+  rsiLowerSeries = rsiChart.addLineSeries({
+    color: 'rgba(22, 163, 74, 0.55)',
+    lineWidth: 1,
+    priceLineVisible: false,
+    lastValueVisible: false
+  });
+
+  chartResizeObserver = new ResizeObserver(entries => {
+    entries.forEach(entry => {
+      const { width, height } = entry.contentRect;
+      if (entry.target === chartContainer) chart.applyOptions({ width, height });
+      if (entry.target === macdContainer) macdChart.applyOptions({ width, height });
+      if (entry.target === rsiContainer) rsiChart.applyOptions({ width, height });
+    });
+  });
+  chartResizeObserver.observe(chartContainer);
+  chartResizeObserver.observe(macdContainer);
+  chartResizeObserver.observe(rsiContainer);
+}
+
+function toLineData(formatted, values) {
+  return formatted
+    .map((point, index) => ({
+      time: point.x,
+      value: values[index]
+    }))
+    .filter(point => point.value != null);
+}
+
+function getOneYearStartIndex(points) {
+  if (!points.length) return 0;
+
+  const lastDate = new Date(`${points[points.length - 1].x}T00:00:00`);
+  const cutoffDate = new Date(lastDate);
+  cutoffDate.setDate(cutoffDate.getDate() - DISPLAY_CALENDAR_DAYS);
+  const index = points.findIndex(point => new Date(`${point.x}T00:00:00`) >= cutoffDate);
+  return index === -1 ? 0 : index;
+}
+
+function formatOhlcData(data) {
+  return data.map(point => ({
+    x: point.date,
+    o: point.open,
+    h: point.high,
+    l: point.low,
+    c: point.close
+  }));
+}
+
+function createTechnicalSignalFromData(data) {
+  const formattedAll = formatOhlcData(data);
+  const closePrices = formattedAll.map(p => p.c);
+  const ema50All = calculateEMA(closePrices, 50);
+  const ema100All = calculateEMA(closePrices, 100);
+  const ema200All = calculateEMA(closePrices, 200);
+  const macdAll = calculateMACD(closePrices);
+  const rsiAll = calculateRSI(closePrices);
+  const startIndex = getOneYearStartIndex(formattedAll);
+
+  return analyzeTechnicalSignal(
+    formattedAll.slice(startIndex),
+    ema50All.slice(startIndex),
+    ema100All.slice(startIndex),
+    ema200All.slice(startIndex),
+    macdAll.macd.slice(startIndex),
+    macdAll.signal.slice(startIndex),
+    macdAll.histogram.slice(startIndex),
+    rsiAll.slice(startIndex)
+  );
+}
+
+function createChart(data, ticker) {
+  const formattedAll = formatOhlcData(data);
+
+  // Calculate EMAs with enough historical data, then display the latest window.
+  const closePrices = formattedAll.map(p => p.c);
+  const ema50All = calculateEMA(closePrices, 50);
+  const ema100All = calculateEMA(closePrices, 100);
+  const ema200All = calculateEMA(closePrices, 200);
+  const macdAll = calculateMACD(closePrices);
+  const rsiAll = calculateRSI(closePrices);
+  const startIndex = getOneYearStartIndex(formattedAll);
+  const formatted = formattedAll.slice(startIndex);
+  const ema50 = ema50All.slice(startIndex);
+  const ema100 = ema100All.slice(startIndex);
+  const ema200 = ema200All.slice(startIndex);
+  const macd = macdAll.macd.slice(startIndex);
+  const macdSignal = macdAll.signal.slice(startIndex);
+  const macdHistogram = macdAll.histogram.slice(startIndex);
+  const rsi = rsiAll.slice(startIndex);
+  const technicalSignal = analyzeTechnicalSignal(formatted, ema50, ema100, ema200, macd, macdSignal, macdHistogram, rsi);
+  watchlistRecommendations[ticker] = technicalSignal;
+  updateSummary(formatted, ticker);
+  updateSuggestion(technicalSignal);
+  updateGauge(technicalSignal);
+
+  ensureChart();
+  candleSeries.setData(formatted.map(point => ({
+    time: point.x,
+    open: point.o,
+    high: point.h,
+    low: point.l,
+    close: point.c
+  })));
+  ema50Series.setData(toLineData(formatted, ema50));
+  ema100Series.setData(toLineData(formatted, ema100));
+  ema200Series.setData(toLineData(formatted, ema200));
+  macdLineSeries.setData(toLineData(formatted, macd));
+  macdSignalSeries.setData(toLineData(formatted, macdSignal));
+  macdHistogramSeries.setData(toLineData(formatted, macdHistogram).map(point => ({
+    ...point,
+    color: point.value >= 0 ? 'rgba(22, 163, 74, 0.48)' : 'rgba(220, 38, 38, 0.48)'
+  })));
+  rsiSeries.setData(toLineData(formatted, rsi));
+  rsiUpperSeries.setData(formatted.map(point => ({ time: point.x, value: 70 })));
+  rsiLowerSeries.setData(formatted.map(point => ({ time: point.x, value: 30 })));
+  chart.timeScale().fitContent();
+  macdChart.timeScale().fitContent();
+  rsiChart.timeScale().fitContent();
+
+  return formatted.length;
+}
+
+async function fetchOhlc(ticker) {
+  const normalizedTicker = normalizeTicker(ticker);
+  if (!normalizedTicker) {
+    showStatus('Please enter a ticker symbol.', true);
+    return;
+  }
+  showStatus('Loading data...', false);
+  try {
+    const params = new URLSearchParams({ ticker: normalizedTicker, range: '2y' });
+    const res = await fetch(`/api/ohlc?${params.toString()}`);
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload.error || 'Failed to fetch OHLC data.');
+    }
+    if (!payload.data.length) {
+      throw new Error('No OHLC data returned for this ticker.');
+    }
+    const visibleDays = createChart(payload.data, payload.ticker);
+    fetchOptionChain(payload.ticker);
+    fetchNews(payload.ticker);
+    fetchAnalystSummary(payload.ticker);
+    currentTicker = payload.ticker;
+    watchlistPrices[payload.ticker] = payload.data[payload.data.length - 1].close;
+    if (payload.data.length > 1) {
+      const last = payload.data[payload.data.length - 1];
+      const previous = payload.data[payload.data.length - 2];
+      const change = last.close - previous.close;
+      watchlistDirections[payload.ticker] = change >= 0 ? 'up' : 'down';
+      watchlistChanges[payload.ticker] = {
+        value: change,
+        percent: (change / previous.close) * 100
+      };
+    }
+    renderWatchlist();
+    showStatus('', false);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+watchlistForm.addEventListener('submit', event => {
+  event.preventDefault();
+  addToWatchlist(watchlistInput.value);
+  watchlistInput.value = '';
+});
+
+watchlistToggle.addEventListener('click', () => {
+  const isCollapsed = workspace.classList.toggle('watchlist-collapsed');
+  watchlistToggle.setAttribute('aria-expanded', String(!isCollapsed));
+  watchlistToggle.setAttribute('aria-label', isCollapsed ? 'Expand watchlist' : 'Collapse watchlist');
+});
+
+optionsExpirySelect.addEventListener('change', () => {
+  fetchOptionChain(currentTicker, optionsExpirySelect.value);
+});
+
+if (themeSelect) {
+  themeSelect.addEventListener('change', () => {
+    applyTheme(themeSelect.value);
+  });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  applyTheme(getSavedTheme());
+  renderWatchlist();
+  refreshWatchlistPrices();
+  fetchOhlc('AAPL');
+});

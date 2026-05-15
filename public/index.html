@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Lens</title>
+  <script>
+    (() => {
+      try {
+        const savedTheme = localStorage.getItem('marketLensTheme');
+        if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+      } catch (error) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main>
+    <header class="site-header" aria-label="Website information">
+      <div class="site-brand">
+        <span class="site-logo" aria-hidden="true">
+          <svg viewBox="0 0 64 64" focusable="false">
+            <circle class="logo-orbit" cx="27" cy="27" r="18.5" />
+            <circle class="logo-glass" cx="27" cy="27" r="13.5" />
+            <path class="logo-handle" d="M40.5 40.5 52 52" />
+            <path class="logo-grid" d="M18.5 27h17M27 18.5v17" />
+            <path class="logo-chart" d="M18.5 32l5.2-5.4 4.4 3.7 7.4-8.8" />
+            <circle class="logo-point" cx="18.5" cy="32" r="1.6" />
+            <circle class="logo-point" cx="35.5" cy="21.5" r="1.6" />
+          </svg>
+        </span>
+        <div>
+          <p class="eyebrow">Market Lens</p>
+          <h1>Stock Research Dashboard</h1>
+        </div>
+      </div>
+      <label class="theme-control site-theme-control" for="theme-select">
+        <span>Theme</span>
+        <select id="theme-select" aria-label="Theme">
+          <option value="light">Light Gray</option>
+          <option value="slate">Cool Slate</option>
+          <option value="mint">Mint</option>
+          <option value="midnight">Midnight</option>
+          <option value="graphite">Graphite</option>
+          <option value="alpine">Alpine</option>
+          <option value="rose">Rose</option>
+          <option value="contrast">High Contrast</option>
+        </select>
+      </label>
+    </header>
+
+    <div class="workspace">
+      <div class="primary-content">
+        <section class="chart-panel" aria-label="Price chart">
+          <div class="chart-header">
+            <div>
+              <h2 id="chart-heading">AAPL</h2>
+            </div>
+            <div id="chart-quote" class="chart-quote" aria-label="Selected ticker quote">
+              <span>Last <strong id="chart-last">--</strong></span>
+              <span>Change <strong id="chart-change">--</strong></span>
+              <span>Change% <strong id="chart-change-percent">--</strong></span>
+            </div>
+            <div class="chart-tools">
+              <div class="legend-note">
+                <span class="legend-dot ema50"></span>EMA 50
+                <span class="legend-dot ema100"></span>EMA 100
+                <span class="legend-dot ema200"></span>EMA 200
+              </div>
+            </div>
+          </div>
+          <div class="chart-frame">
+            <div id="ohlc-chart"></div>
+            <div class="indicator-pane">
+              <span>MACD</span>
+              <div id="macd-chart"></div>
+            </div>
+            <div class="indicator-pane">
+              <span>RSI</span>
+              <div id="rsi-chart"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="options-panel" aria-label="Option chain">
+          <div class="options-panel-header">
+            <div>
+              <p class="eyebrow">Option Chain</p>
+              <h2 id="options-title">AAPL</h2>
+            </div>
+            <label for="options-expiry-select">Expiry</label>
+            <select id="options-expiry-select"></select>
+          </div>
+          <div id="options-status" class="options-status">Option chain loads after a ticker is selected.</div>
+          <div class="options-table-wrap">
+            <table class="options-table">
+              <thead>
+                <tr>
+                  <th colspan="4">Calls</th>
+                  <th>Strike</th>
+                  <th colspan="4">Puts</th>
+                </tr>
+                <tr>
+                  <th>Last</th>
+                  <th>Bid</th>
+                  <th>Ask</th>
+                  <th>Vol</th>
+                  <th>Strike</th>
+                  <th>Last</th>
+                  <th>Bid</th>
+                  <th>Ask</th>
+                  <th>Vol</th>
+                </tr>
+              </thead>
+              <tbody id="options-chain-body">
+                <tr>
+                  <td colspan="9">No option chain loaded.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <div class="side-content">
+        <aside id="watchlist-panel" class="watchlist-panel" aria-label="Watchlist">
+          <button id="watchlist-toggle" class="watchlist-toggle" type="button" aria-expanded="true" aria-controls="watchlist-content" aria-label="Collapse watchlist">
+            <span class="toggle-arrow" aria-hidden="true">›</span>
+            <span class="collapse-closed" aria-hidden="true">Watchlist</span>
+          </button>
+          <div id="watchlist-content" class="watchlist-content">
+            <div class="sentiment-panel">
+              <div class="sentiment-heading">
+                <h2 id="sentiment-ticker-heading">AAPL</h2>
+              </div>
+              <div id="signal-gauge" class="signal-gauge neutral" aria-label="Technical rating gauge">
+                <span id="gauge-percent" class="gauge-percent">50%</span>
+                <div class="gauge-dial" aria-hidden="true">
+                  <div id="gauge-pointer" class="gauge-pointer"></div>
+                  <div class="gauge-hub"></div>
+                </div>
+                <div class="gauge-labels" aria-hidden="true">
+                  <span>Strong Sell</span>
+                  <span>Sell</span>
+                  <span>Neutral</span>
+                  <span>Buy</span>
+                  <span>Strong Buy</span>
+                </div>
+                <strong id="gauge-rating">Neutral</strong>
+              </div>
+              <div id="stock-suggestion" class="stock-suggestion">Signal appears after a ticker loads.</div>
+              <div id="analyst-summary" class="analyst-summary" aria-label="Analyst price target and recommendation">
+                <span><small>Recommendation</small><strong id="analyst-recommendation">--</strong></span>
+                <span><small>Target</small><strong id="analyst-target">--</strong></span>
+                <span><small>Upside</small><strong id="analyst-upside">--</strong></span>
+                <span><small>Analysts</small><strong id="analyst-count">--</strong></span>
+              </div>
+            </div>
+
+            <div class="watchlist-header">
+              <div>
+                <p class="eyebrow">Watchlist</p>
+              </div>
+            </div>
+
+            <form id="watchlist-form" class="watchlist-form">
+              <label for="watchlist-input">Add ticker</label>
+              <div class="watchlist-input-row">
+                <input id="watchlist-input" name="watchlist-symbol" type="text" placeholder="MSFT" autocomplete="off" spellcheck="false" />
+                <button type="submit" aria-label="Add ticker">✓</button>
+              </div>
+            </form>
+            <div id="status" class="status"></div>
+
+            <div class="watchlist-table-head" aria-hidden="true">
+              <span>Ticker</span>
+              <span>Last</span>
+              <span>Change</span>
+              <span>Change%</span>
+              <span>Rec</span>
+              <span></span>
+            </div>
+            <div id="watchlist-items" class="watchlist-items"></div>
+
+            <section class="news-panel" aria-label="Market news">
+              <div class="news-panel-header">
+                <div>
+                  <p class="eyebrow">Market News</p>
+                  <h2 id="news-title">AAPL news</h2>
+                </div>
+              </div>
+              <div id="news-status" class="news-status">News loads after a ticker is selected.</div>
+              <div id="news-items" class="news-grid"></div>
+            </section>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
