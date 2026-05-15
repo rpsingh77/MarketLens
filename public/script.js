@@ -432,7 +432,6 @@ function renderWatchlist() {
         <span class="watchlist-ticker">${symbol}</span>
         <span class="watchlist-company">${companyName}</span>
       </span>
-      <span class="watchlist-sparkline-wrap">${thirtyDaySparkline}</span>
       <span class="watchlist-sparkline-wrap">${intradaySparkline}</span>
       <span class="watchlist-price">${price ? formatCurrency(price) : '--'}</span>
       <span class="watchlist-change">${changeValueText}</span>

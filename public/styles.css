@@ -1092,7 +1092,7 @@ button:active {
 }
 
 .watchlist-content {
-  --watchlist-grid: 24px minmax(72px, 1fr) 58px 58px 66px 66px 62px 58px 22px;
+  --watchlist-grid: 24px minmax(72px, 1fr) 58px 66px 66px 62px 58px 22px;
   --watchlist-gap: 4px;
   height: calc(100% - 36px);
   min-height: 0;
@@ -1240,8 +1240,7 @@ button:active {
 }
 
 .watchlist-symbol {
-  grid-column: 2 / 9;
-  min-height: 46px;
+   grid-column: 2 / 8;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -1250,7 +1249,7 @@ button:active {
   color: var(--text);
   box-shadow: none;
   display: grid;
-  grid-template-columns: minmax(72px, 1fr) 58px 58px 66px 66px 62px 58px;
+  grid-template-columns: minmax(72px, 1fr) 58px 66px 66px 62px 58px;
   grid-template-columns: subgrid;
   align-items: center;
   gap: var(--watchlist-gap);
